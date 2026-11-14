@@ -29,6 +29,7 @@ data Expr = Add Expr Expr     -- add two values
           | ToInt Expr        -- to integer
           | ToFloat Expr      -- to float
           | ToBool Expr       -- to bool
+          | Electrocute Expr  -- flip the binary digits of a number
           | Val Value         -- value
           | Var Name          -- variable support
   deriving Show
@@ -198,7 +199,10 @@ eval vars (ToFloat x) = case eval vars x of
                           Right (BoolValue True) -> Right (FloatValue 1.0)
                           Right (BoolValue False) -> Right (FloatValue 0.0)
                           _ -> Left "parse error"
-eval vars (ToBool x) = case eval vars x of 
+eval vars (Electrocute x) = do -- flip the bits of an integer/double
+                        xNum <- eval vars x
+                        Right (electrocuteValues xNum) -- call from Value.hs
+eval vars (ToBool x) = case eval vars x of
                           Right (BoolValue _) -> eval vars x
                           Right (IntValue 0) -> Right (BoolValue False)
                           Right (IntValue _) -> Right (BoolValue True) -- any non 0 value is true
@@ -207,6 +211,47 @@ eval vars (ToBool x) = case eval vars x of
                           Right (FloatValue 0.0) -> Right (BoolValue False)
                           Right (FloatValue _) -> Right (BoolValue True)
                           _ -> Left "parse error"
+
+-- ELECTROCUTION SIDE EFFECTS --
+-- 'eval' is pure, so electrocuting a string or character only gives its value
+-- there; the consequences below are worked out separately and carried out by the REPL.
+
+data Effect = KickedInHead (Maybe Name) -- a string horse was offended; you are concussed
+            | HorseDied (Maybe Name)    -- a character horse died
+  deriving (Show, Eq)
+
+-- | How many lines a kick to the head leaves you concussed for.
+concussionLines :: Int
+concussionLines = 5
+
+-- | Every electrocution side effect in an expression, in left-to-right order.
+electrocuteEffects :: Map Name Value -> Expr -> [Effect]
+electrocuteEffects vars e = concatMap (electrocuteEffects vars) (children e) ++ here e
+  where
+    here (Electrocute x) = case eval vars x of
+      Right (StrValue _)  -> [KickedInHead (horseName x)]
+      Right (CharValue _) -> [HorseDied (horseName x)]
+      _                   -> []
+    here _ = []
+    horseName (Var n) = Just n
+    horseName _       = Nothing
+
+-- | The message shown for an effect.
+effectMessage :: Effect -> String
+effectMessage (KickedInHead n) = "You were kicked in the head because " ++ maybe "a nameless horse" id n
+                              ++ " was offended! You are concussed for the next five lines."
+effectMessage (HorseDied n)    = maybe "A nameless horse" id n ++ " has died."
+
+-- | The direct sub-expressions of an expression.
+children :: Expr -> [Expr]
+children e = case e of
+  Add a b -> [a, b];    Sub a b -> [a, b];  Mul a b -> [a, b];  Div a b -> [a, b]
+  Mod a b -> [a, b];    Pow a b -> [a, b];  Concat a b -> [a, b]
+  And a b -> [a, b];    Nand a b -> [a, b]; Or a b -> [a, b];   Xor a b -> [a, b]
+  Nor a b -> [a, b];    Imp a b -> [a, b];  Eq a b -> [a, b]
+  Abs a -> [a];         Not a -> [a];       ToString a -> [a];  ToInt a -> [a]
+  ToFloat a -> [a];     ToBool a -> [a];    Electrocute a -> [a]
+  Val _ -> [];          Var _ -> []
 
 -- | Look a variable up in the environment.
 valueOf :: Name -> Map Name Value -> Either String Value
@@ -242,13 +287,15 @@ kwToString = "toSuffolkPunch" -- toString
 kwToFloat  = "maretosis"      -- toFloat
 kwToInt    = "amalgamare"     -- toInt
 kwToBool   = "addSpots"       -- toBoolean
+kwElectrocute :: String
+kwElectrocute = "electrocute" -- flip the bits of a number
 kwThe, kwSays :: String
 kwThe      = "the"            -- start of a variable declaration
 kwSays     = "says"           -- between the variable name and its value
 
 -- | Words that cannot be used as variable names.
 reserved :: [String]
-reserved = [kwTrue, kwFalse, kwPrint, kwAbs, kwToString, kwToFloat, kwToInt, kwToBool, kwThe, kwSays]
+reserved = [kwTrue, kwFalse, kwPrint, kwAbs, kwToString, kwToFloat, kwToInt, kwToBool, kwThe, kwSays, kwElectrocute]
         ++ ["duplicateHorse"] -- reserved for future use
 
 identifier :: Parser Name
@@ -278,7 +325,7 @@ pPrint :: Parser Command
 pPrint = optional (keyword kwPrint) *> (Print <$> pExpr)
 
 pExpr :: Parser Expr
-pExpr = pAbsolute <|> pNot <|> pToString <|> pToBool <|> pToNum <|> pTerm
+pExpr = pAbsolute <|> pNot <|> pToString <|> pToBool <|> pToNum <|> pElectrocute <|> pTerm
 
 pTerm :: Parser Expr
 pTerm = chainl1 pFactor (booleanOperators <|> concatOperator <|> modPowOperator <|> mulDivOperator <|> addSubOperator)
@@ -341,7 +388,8 @@ pVariable = Var <$> identifier
 pParenExpr :: Parser Expr
 pParenExpr = between (symbol "(") (symbol ")") pExpr
 
-pToString, pToBool, pToNum, pToInt, pToFloat, pAbsolute, pNot :: Parser Expr
+pToString, pToBool, pToNum, pToInt, pToFloat, pAbsolute, pNot, pElectrocute :: Parser Expr
+pElectrocute = Electrocute <$> (keyword kwElectrocute *> pExpr)
 pToString = ToString <$> (keyword kwToString *> pExpr)
 pToBool   = ToBool   <$> (keyword kwToBool *> pExpr)
 pToNum    = pToFloat <|> pToInt

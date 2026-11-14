@@ -40,7 +40,13 @@ showBinFloat x
   | isNaN x       = "NaN"
   | isInfinite x  = if x > 0 then "Infinity" else "-Infinity"
   | x < 0         = '-' : showBinFloat (negate x)
-  | otherwise     = concatMap bitWord (natBits whole) ++ "." ++ concatMap bitWord fracBits
+  | otherwise     = concatMap bitWord whole ++ "." ++ concatMap bitWord frac
+  where (whole, frac) = floatBits x
+
+-- | Digits before and after the binary point of a finite, non-negative double,
+-- exactly as they are printed.
+floatBits :: Double -> ([Bool], [Bool])
+floatBits x = (natBits whole, fracBits)
   where
     r        = toRational x
     whole    = floor r :: Integer
@@ -49,6 +55,29 @@ showBinFloat x
                  bs -> bs
     go 0 = []
     go f = let f2 = f * 2 in (f2 >= 1) : go (if f2 >= 1 then f2 - 1 else f2)
+
+-- ELECTROCUTE --
+-- Numbers: flip every printed binary digit, keeping the sign.
+--   cl1pcl0pcl1p (5) -> cl0pcl1pcl0p (2)      cl1pcl0p.cl1p (2.5) -> cl0pcl1p.cl0p (1.0)
+-- Booleans: flipped.
+-- Strings: unchanged (the horse kicks you instead; see electrocuteEffects).
+-- Characters: the horse dies, leaving only unit.
+electrocuteValues               :: Value -> Value
+electrocuteValues (ErrValue x)          = ErrValue x
+electrocuteValues (BoolValue b)         = BoolValue (not b)
+electrocuteValues (StrValue s)          = StrValue s
+electrocuteValues (CharValue _)         = UnitValue
+electrocuteValues (IntValue x)
+  | x < 0     = IntValue (negate (flipInt (negate x)))
+  | otherwise = IntValue (flipInt x)
+  where flipInt = fromInteger . bitsToInt . map not . natBits . toInteger
+electrocuteValues (FloatValue x)
+  | isNaN x || isInfinite x = ErrValue "cannot electrocute a NaN or infinite number"
+  | x < 0     = FloatValue (negate (flipFloat (negate x)))
+  | otherwise = FloatValue (flipFloat x)
+  where flipFloat v = let (w, f) = floatBits v
+                      in fromRational (fromInteger (bitsToInt (map not w)) + bitsToFrac (map not f))
+electrocuteValues _                     = ErrValue "Invalid value type for: electrocute"
 
 -- | Value of a list of binary digits (most significant first).
 bitsToInt :: [Bool] -> Integer
