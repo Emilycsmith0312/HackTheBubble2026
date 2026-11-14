@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Bubble.REPL (repl)
+import ClipClop.REPL (repl)
 
 main :: IO ()
 main = repl

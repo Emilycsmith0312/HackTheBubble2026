@@ -1,7 +1,7 @@
--- | Parsec-based parser for Bubble.
-module Bubble.Parser (parseExpr) where
+-- | Parsec-based parser for ClipClop.
+module ClipClop.Parser (parseExpr) where
 
-import Bubble.Syntax
+import ClipClop.Syntax
 import Text.Parsec
 import Text.Parsec.String (Parser)
 

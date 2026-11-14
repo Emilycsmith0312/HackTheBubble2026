@@ -15,14 +15,14 @@ common shared
 library
   import:            shared
   hs-source-dirs:    src
-  exposed-modules:   Bubble.Syntax
-                     Bubble.Parser
-                     Bubble.Eval
-                     Bubble.REPL
-                     Bubble.Variables
-                     Bubble.Abstractions
-                     Bubble.Applications
-                     Bubble.CaseExpressions
+  exposed-modules:   ClipClop.Syntax
+                     ClipClop.Parser
+                     ClipClop.Eval
+                     ClipClop.REPL
+                     ClipClop.Variables
+                     ClipClop.Abstractions
+                     ClipClop.Applications
+                     ClipClop.CaseExpressions
   build-depends:     base >=4.14 && <5,
                      parsec >=3.1 && <3.2
 

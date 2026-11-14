@@ -1,7 +1,7 @@
 module Main (main) where
 
-import Bubble.Parser (parseExpr)
-import Bubble.Syntax
+import ClipClop.Parser (parseExpr)
+import ClipClop.Syntax
 import System.Exit
 
 main :: IO ()

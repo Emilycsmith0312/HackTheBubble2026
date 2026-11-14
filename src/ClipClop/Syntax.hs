@@ -1,5 +1,5 @@
--- | The abstract syntax tree of Bubble.
-module Bubble.Syntax (Name, Expr (..)) where
+-- | The abstract syntax tree of ClipClop.
+module ClipClop.Syntax (Name, Expr (..)) where
 
 type Name = String
 
