@@ -7,13 +7,14 @@ module ClipClop.REPL (repl) where
 
 import ClipClop.BinaryExpressions
 import ClipClop.Moods
-import ClipClop.Sound (Sounds, exprCues, initSounds, playCues)
+import ClipClop.Sound (Sounds, exprCues, initSounds, playCues, textCues)
 import ClipClop.Value
 import Control.Exception (IOException, try)
 import Control.Monad (foldM)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char (isSpace)
-import Data.List (dropWhileEnd, intercalate, isPrefixOf)
+import Data.IORef (newIORef, readIORef, writeIORef)
+import Data.List (dropWhileEnd, intercalate, isPrefixOf, isSuffixOf)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Time.Clock.POSIX (getPOSIXTime)
@@ -30,6 +31,7 @@ data ReplState = ReplState
   , gen       :: Gen    -- random numbers for the horses' moods
   , calm      :: Bool   -- True if the horses never change mood (CLIPCLOP_CALM is set)
   , sounds    :: Sounds -- sound effects
+  , telling   :: [FilePath] -- the stories being read right now, innermost first
   }
 
 repl :: IO ()
@@ -46,7 +48,7 @@ repl = do
   snd' <- initSounds
   runInputT settings . withInterrupt $ do
     outputStrLn "\nClip Clop REPL. Type :help for commands, :shoo or :q to quit.\n"
-    loop (ReplState emptyEnv 0 (mkGen seed) isCalm snd')
+    loop (ReplState emptyEnv 0 (mkGen seed) isCalm snd' [])
 
 ------------------------------------------------------------------------------
 -- The loop and the : commands
@@ -175,6 +177,8 @@ helpText = unlines
   , "  giddyup NAME with EXPR and EXPR                  ride it"
   , "  foal TYPE ridden by TYPE A says EXPR             a horse too young to have a name"
   , "  whinny EXPR snort EXPR says EXPR stomp nicker says EXPR stomp"
+  , "  lunge NAME COMMAND COMMAND ... whoa              go round in circles until NAME says cl0p"
+  , "  readStory \"FILE.dotclipclop\"                    run each line of a story file"
   , "  pssssst the rest of the line is a secret"
   , "Horse care"
   , "  treat NAME, interrogate NAME, honey NAME, makeup NAME and NAME"
@@ -218,7 +222,19 @@ runCommand st cmd = case cmd of
   Set t name [] e -> evaluate st e $ \v -> case checkType t v of
     Left err -> say st ("Error: " ++ err) >> return id
     Right _  -> return (\en -> en { envVars = Map.insert name v (envVars en) })
-  Print e         -> evaluate st e $ \v -> say st (show v) >> return id
+  Print e         -> evaluate st e $ \v -> do
+    say st (show v)
+    playCues (sounds st) (textCues (show v)) -- the answer is read out as well
+    return id
+  ReadStory e     -> do
+    name <- newIORef Nothing
+    st' <- evaluate st e $ \v -> writeIORef name (Just v) >> return id
+    told <- readIORef name
+    case told of
+      Just (StrValue f) -> readStory st' f
+      Just _            -> say st' ("Error: the name of a story must be a " ++ typeName TString) >> return st'
+      Nothing           -> return st' -- the name could not be evaluated; already reported
+  Lunge n body    -> playCues (sounds st) ["lunge"] >> rested <$> lunge st n body 1
   Treat n         -> care st [n] "treat" $ \h -> case moodOf n h of
     Just Sulking -> (clearMood n h, n ++ " munches the treat and decides to notice you again.")
     Just RanAway -> (h, n ++ " is not here to take the treat.")
@@ -233,6 +249,59 @@ runCommand st cmd = case cmd of
   MakeUp a b      -> care st [a, b] "makeup" $ \h ->
     if feuding a b h then (endFeud a b h, a ++ " and " ++ b ++ " nuzzle and make up.")
                      else (h, a ++ " and " ++ b ++ " were not fighting.")
+
+-- | Run every line of a story file, exactly as if it had been typed at the
+-- prompt: one statement per line, backslash continuations, pssssst comments.
+-- A story may read other stories, but not one that is already being read.
+readStory :: ReplState -> FilePath -> IO ReplState
+readStory st f
+  | not (storyExtension `isSuffixOf` f) =
+      say st ("Error: " ++ f ++ " is not a story (stories end in " ++ storyExtension ++ ")") >> return st
+  | f `elem` telling st =
+      say st ("Error: " ++ f ++ " is already being told") >> return st
+  | otherwise = do
+      r <- try (readFile f >>= \src -> length src `seq` return src) :: IO (Either IOException String)
+      case r of
+        Left _    -> say st ("Error: nobody knows the story " ++ f) >> return st
+        Right src -> do
+          st' <- runLines st { telling = f : telling st } src
+          return st' { telling = telling st }
+
+-- | How many laps a horse can be lunged for before it gets dizzy.
+dizzyLaps :: Int
+dizzyLaps = 100
+
+-- | The loop. The horse is walked in circles until its number reaches zero,
+-- and the commands run once per lap. The catches:
+--
+--   * the horse's number moves one step towards zero after every lap, so the
+--     loop counts down (or up, from a negative number) and uses the horse up:
+--     it says cl0p afterwards;
+--   * the horse changes rein after every lap, so every second lap runs the
+--     commands in reverse order;
+--   * the horse is asked for its number before every lap, which is one more
+--     chance for it to change mood. A sulking or runaway horse ends the loop
+--     early (lunge it again after curing it to do the remaining laps); a lying
+--     horse never admits to reaching zero;
+--   * after 'dizzyLaps' laps the horse is too dizzy to go on, and bolts.
+lunge :: ReplState -> Name -> [Command] -> Int -> IO ReplState
+lunge st0 n body lap = case evalTop (env st) (Var n) of
+    Left err           -> say st ("Error: " ++ err) >> return st
+    Right (IntValue 0) -> playCues (sounds st) ["whoa"] >> return st
+    Right (IntValue _)
+      | lap > dizzyLaps -> do
+          say st (n ++ " got dizzy after " ++ show dizzyLaps ++ " laps and bolted.")
+          return st { env = (env st) { envHerd = setMood n RanAway (envHerd (env st)) } }
+      | otherwise -> do
+          st' <- foldM runCommand st (if even lap then reverse body else body)
+          lunge st' { env = closer (env st') } n body (lap + 1)
+    Right _            -> say st ("Error: only a " ++ typeName TInt ++ " can be lunged") >> return st
+  where
+    st = stir st0 (Var n)
+    -- one step towards zero, if the commands left it a number at all
+    closer en = case Map.lookup n (envVars en) of
+      Just (IntValue k) -> en { envVars = Map.insert n (IntValue (k - signum k)) (envVars en) }
+      _                 -> en
 
 -- | One more line of concussion has passed.
 rested :: ReplState -> ReplState

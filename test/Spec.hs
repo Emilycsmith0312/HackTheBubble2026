@@ -79,6 +79,17 @@ tests =
   , ("different types",      ask herd "whinny a snort \"x\" says cl1p stomp nicker says cl0p" == Right (IntValue 0))
   , ("recursion ends",       ask herd "giddyup sumto with cl1pcl0pcl0p" == Right (IntValue 10))
   , ("two nickers",          isLeft (parseCommands "whinny a nicker says a nicker says a"))
+  -- lunge
+  , ("lunge parses",         case parseCommands "lunge a the SingularHorse b says b + a  a + b whoa a" of
+                               Right [Lunge "a" [Set _ "b" [] _, Print _], Print _] -> True
+                               _ -> False)
+  , ("nested lunge",         case parseCommands "lunge a lunge b a whoa whoa" of
+                               Right [Lunge "a" [Lunge "b" [Print _]]] -> True
+                               _ -> False)
+  , ("lunge needs whoa",     isLeft (parseCommands "lunge a a + b"))
+  , ("readStory parses",     case parseCommands "readStory \"a.dotclipclop\" a" of
+                               Right [ReadStory (Val (StrValue "a.dotclipclop")), Print _] -> True
+                               _ -> False)
   -- comments
   , ("comment at the end",   ask herd "a + b pssssst not this" == Right (IntValue 3))
   , ("comment in a string",  ask herd "\"pssssst\"" == Right (StrValue "pssssst"))

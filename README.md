@@ -21,6 +21,8 @@ cabal test               # run the tests
 - [Keyword operators](#keyword-operators)
 - [Functions](#functions)
 - [Whinny (case expressions)](#whinny-case-expressions)
+- [Lunging (loops)](#lunging-loops)
+- [Stories (running files)](#stories-running-files)
 - [Electrocution](#electrocution)
 - [Moods](#moods)
 - [Sound effects](#sound-effects)
@@ -281,6 +283,81 @@ is `"three"`: it matched `"two"`, fell into `"three"`, and stomped.
   the body of another, put brackets round the inner one.
 - The arms may have different types.
 
+## Lunging (loops)
+
+To lunge a horse is to make it go round in circles on the end of a rope.
+
+```
+lunge NAME
+  STATEMENT
+  STATEMENT
+whoa
+```
+
+`NAME` must be a `SingularHorse` horse. The statements run once per lap, and
+the horse does laps until it says `cl0p`.
+
+```
+the SingularHorse n says cl1pcl0pcl1p
+the SingularHorse total says cl0p
+lunge n the SingularHorse total says total + n whoa
+total                                    pssssst 5 + 4 + 3 + 2 + 1
+```
+
+(In the REPL the whole loop must be on one line, or each line but the last must
+end in `\`.)
+
+The catches:
+
+- **It only counts down.** After every lap the horse's number moves one step
+  towards zero (a negative number counts up).
+- **It uses the horse up.** After the loop the horse says `cl0p`. If you wanted
+  that number, you should have copied it first.
+- **The horse changes rein every lap.** The first lap runs the statements top to
+  bottom, the second lap runs them bottom to top, the third top to bottom again.
+- **The horse is asked for its number before every lap**, and every time is
+  another chance for its [mood](#moods) to change:
+  - if it sulks or runs away, the loop stops there with the work half done.
+    Cure it and lunge it again to do the laps that are left (starting, of
+    course, on the original rein);
+  - if it lies, it never admits to reaching `cl0p`, and keeps going.
+- **Horses get dizzy.** After 100 laps the horse bolts: the loop ends and the
+  horse has run away. For more than 100 laps, lunge one horse inside another.
+- A statement that fails prints its error and the lap carries on.
+- If the statements change the horse's number, the loop believes them.
+
+Loops can be nested; each `whoa` ends the nearest `lunge`.
+
+## Stories (running files)
+
+A program saved in a file is a story. `readStory` reads one out, running each
+line exactly as if you had typed it at the prompt.
+
+```
+readStory EXPRESSION
+```
+
+```
+readStory "tales/fact.dotclipclop"
+
+the SuffolkPunch tale says "tales/fact.dotclipclop"
+readStory tale
+```
+
+- The expression must be a `SuffolkPunch`: the path of the file, relative to
+  where you started the REPL.
+- **The file's name must end in `.dotclipclop`.** Anything else is not a story
+  and will not be read.
+- Inside the file the rules are the REPL's rules: one statement per line, a
+  trailing `\` to continue onto the next line, `pssssst` for comments, blank
+  lines ignored. `:` commands are for the REPL only and do not work in a story.
+- A line that fails prints its error and the story carries on.
+- Everything the story does stays done: its horses are your horses afterwards,
+  and their moods change as usual while it is read.
+- A story can read other stories, but not one that is already being read.
+- If the name comes from a horse, that horse has to be in the mood to tell you.
+  A lying horse gives the name backwards.
+
 ## Electrocution
 
 `electrocute` depends on what you electrocute:
@@ -346,7 +423,7 @@ list of names and how to add more.
 |---------------|-----------------------------------------------------------|
 | `:help`       | show help                                                 |
 | `:vars`       | list the horses and what they (claim to) say              |
-| `:load FILE`  | run each line of a file                                   |
+| `:load FILE`  | run each line of a file (any file; see also `readStory`)  |
 | `:reset`      | release all the horses                                    |
 | `:seed N`     | restart the horses' moods from seed N                     |
 | `:q`, `:quit` | quit                                                      |
@@ -368,6 +445,8 @@ the says saysomethinggirl neigh neighneigh
 geld toSuffolkPunch amalgamare maretosis addSpots speakupgirl quietdowngirl electrocute
 ridden by and giddyup with foal
 whinny snort nicker stomp
+lunge whoa
+readStory
 treat interrogate honey makeup
 duplicateHorse
 ```

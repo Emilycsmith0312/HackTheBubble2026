@@ -22,6 +22,11 @@ data Command = Set Type Name [(Type, Name)] Expr
              | Interrogate Name   -- interrogate {name}: a lying horse tells the truth again
              | Honey Name         -- honey {name}: coax back a horse that ran away
              | MakeUp Name Name   -- makeup {name} and {name}: end a feud between two horses
+             | ReadStory Expr     -- readStory {expr}: run every line of a .dotclipclop file
+             | Lunge Name [Command]
+               -- ^ loop: lunge {name} {command} {command} ... whoa
+               -- Runs the commands once for every step it takes to walk the
+               -- horse's number to zero (see 'lunge' in the REPL for the catches).
   deriving Show
 
 -- | Everything an expression is evaluated against.
@@ -429,9 +434,9 @@ keyword s = try (lexeme (string s *> notFollowedBy alphaNum))
 kwTrue, kwFalse, kwPrint, kwAbs, kwToString, kwToFloat, kwToInt, kwToBool, kwShout, kwWhisper :: String
 kwTrue     = "neighneigh"     -- true
 kwFalse    = "neigh"          -- false
-kwPrint    = "saysomethinggirl" -- print
-kwShout    = "speakupgirl"    -- to upper
-kwWhisper  = "quietdowngirl"  -- to lower
+kwPrint    = "wellsaysomething" -- print
+kwShout    = "speakup"    -- to upper
+kwWhisper  = "quietdown"  -- to lower
 kwAbs      = "geld"           -- abs
 kwToString = "toSuffolkPunch" -- toString
 kwToFloat  = "maretosis"      -- toFloat
@@ -454,6 +459,12 @@ kwWhinny   = "whinny"         -- switch
 kwSnort    = "snort"          -- case
 kwNicker   = "nicker"         -- default
 kwStomp    = "stomp"          -- break
+kwReadStory, storyExtension :: String
+kwReadStory    = "readStory"    -- run the lines of a story file
+storyExtension = ".dotclipclop" -- what a story file's name must end in
+kwLunge, kwWhoa :: String
+kwLunge    = "lunge"          -- start of a loop
+kwWhoa     = "whoa"           -- end of a loop
 kwTreat, kwInterrogate, kwHoney, kwMakeUp :: String
 kwTreat       = "treat"       -- give a sulking horse a treat
 kwInterrogate = "interrogate" -- make a lying horse confess
@@ -464,7 +475,7 @@ kwMakeUp      = "makeup"      -- force two feuding horses to make up
 reserved :: [String]
 reserved = [kwTrue, kwFalse, kwPrint, kwAbs, kwToString, kwToFloat, kwToInt, kwToBool, kwThe, kwSays, kwElectrocute, kwShout, kwWhisper]
         ++ [kwRidden, kwBy, kwAnd, kwCall, kwWith, kwTreat, kwInterrogate, kwHoney, kwMakeUp]
-        ++ [kwFoal, kwWhinny, kwSnort, kwNicker, kwStomp]
+        ++ [kwFoal, kwWhinny, kwSnort, kwNicker, kwStomp, kwLunge, kwWhoa, kwReadStory]
         ++ ["duplicateHorse"] -- reserved for future use
 
 identifier :: Parser Name
@@ -474,7 +485,17 @@ identifier = try $ do
 
 -- Parse the command
 pCommand :: Parser Command
-pCommand = spaces *> (pSet <|> pHorseCare <|> pPrint)
+pCommand = spaces *> (pSet <|> pHorseCare <|> pLunge <|> pReadStory <|> pPrint)
+
+-- run a story file
+-- readStory {expression}      (the expression must be a SuffolkPunch: the file's name)
+pReadStory :: Parser Command
+pReadStory = ReadStory <$> (keyword kwReadStory *> pExpr)
+
+-- loop
+-- lunge {name} {command} {command} ... whoa
+pLunge :: Parser Command
+pLunge = Lunge <$> (keyword kwLunge *> identifier) <*> (many pCommand <* keyword kwWhoa)
 
 -- looking after the horses' moods
 -- treat {name} | interrogate {name} | honey {name} | makeup {name} and {name}
