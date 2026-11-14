@@ -1,15 +1,62 @@
-module Value where
+module ClipClop.Value where
 
-data Value = IntValue Int | StrValue String | FloatValue Float | BoolValue Bool | ErrValue String
+data Value = IntValue Int | StrValue String | FloatValue Double | BoolValue Bool | CharValue Char | UnitValue | ErrValue String
         deriving (Eq)
 
-instance Show Value where 
-  show (IntValue x) = show x
-  show (FloatValue x) = show x
+instance Show Value where
+  show (IntValue x) = showBinInt x
+  show (FloatValue x) = showBinFloat x
   show (StrValue x) = x
+  show (CharValue c) = [c]
+  show UnitValue = "()"
   show (BoolValue True) = "neighneigh"
   show (BoolValue False) = "neigh"
   show (ErrValue x) = x
+
+-- BINARY NUMBER FORMAT --
+-- Numbers are written in binary, with each digit spelled out: 0 is "cl0p", 1 is "cl1p".
+-- e.g. 5 = cl1pcl0pcl1p, -2 = -cl1pcl0p, 2.5 = cl1pcl0p.cl1p
+
+bitWord :: Bool -> String
+bitWord False = "cl0p"
+bitWord True  = "cl1p"
+
+-- | Binary digits of a non-negative whole number, most significant first.
+natBits :: Integer -> [Bool]
+natBits 0 = [False]
+natBits n = reverse (go n)
+  where go 0 = []
+        go k = odd k : go (k `div` 2)
+
+showBinInt :: Int -> String
+showBinInt x
+  | x < 0     = '-' : showBinInt' (negate (toInteger x))
+  | otherwise = showBinInt' (toInteger x)
+  where showBinInt' = concatMap bitWord . natBits
+
+-- | Floats are binary internally, so the fractional part always terminates.
+showBinFloat :: Double -> String
+showBinFloat x
+  | isNaN x       = "NaN"
+  | isInfinite x  = if x > 0 then "Infinity" else "-Infinity"
+  | x < 0         = '-' : showBinFloat (negate x)
+  | otherwise     = concatMap bitWord (natBits whole) ++ "." ++ concatMap bitWord fracBits
+  where
+    r        = toRational x
+    whole    = floor r :: Integer
+    fracBits = case go (r - fromInteger whole) of
+                 [] -> [False]  -- always show at least one fractional digit
+                 bs -> bs
+    go 0 = []
+    go f = let f2 = f * 2 in (f2 >= 1) : go (if f2 >= 1 then f2 - 1 else f2)
+
+-- | Value of a list of binary digits (most significant first).
+bitsToInt :: [Bool] -> Integer
+bitsToInt = foldl (\acc b -> acc * 2 + (if b then 1 else 0)) 0
+
+-- | Value of the binary digits after the point.
+bitsToFrac :: [Bool] -> Rational
+bitsToFrac = foldr (\b acc -> ((if b then 1 else 0) + acc) / 2) 0
 
 
 -- ADD SUBTRACT MULTIPLY DIVIDE --

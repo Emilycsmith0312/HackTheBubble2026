@@ -18,12 +18,15 @@ library
   exposed-modules:   ClipClop.Syntax
                      ClipClop.Parser
                      ClipClop.Eval
+                     ClipClop.BinaryExpressions
+                     ClipClop.Value
                      ClipClop.REPL
                      ClipClop.Variables
                      ClipClop.Abstractions
                      ClipClop.Applications
                      ClipClop.CaseExpressions
   build-depends:     base >=4.14 && <5,
+                     containers,
                      parsec >=3.1 && <3.2
 
 executable bubble2026
