@@ -20,6 +20,8 @@ library
                      ClipClop.Eval
                      ClipClop.BinaryExpressions
                      ClipClop.Value
+                     ClipClop.Moods
+                     ClipClop.Sound
                      ClipClop.REPL
                      ClipClop.Variables
                      ClipClop.Abstractions
@@ -29,7 +31,9 @@ library
                      containers,
                      parsec >=3.1 && <3.2,
                      haskeline,
-                     directory
+                     directory,
+                     process,
+                     time
 
 executable bubble2026
   import:            shared
@@ -47,6 +51,7 @@ test-suite bubble2026-test
   hs-source-dirs:    test
   build-depends:     base >=4.14 && <5,
                      parsec >=3.1 && <3.2,
+                     containers,
                      bubble2026,
                      haskeline,
                      directory

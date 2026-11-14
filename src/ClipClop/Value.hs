@@ -1,7 +1,82 @@
 module ClipClop.Value where
 
+import Data.List (intercalate)
+
+type Name = String
+
 data Value = IntValue Int | StrValue String | FloatValue Double | BoolValue Bool | CharValue Char | UnitValue | ErrValue String
+           | FunValue Function -- a horse that must be ridden (functions are values like any other)
         deriving (Eq)
+
+-- Variable types
+data Type = TInt     -- SingularHorse
+          | TDouble  -- PairOfHorses
+          | TChar    -- Shetland
+          | TString  -- SuffolkPunch
+          | TBool    -- Appaloosa
+          | TUnit    -- Unitcorn
+          | TFun     -- Steed (any function, whatever its riders)
+  deriving (Show, Eq)
+
+-- | The Clip Clop name of each type.
+typeNames :: [(Type, String)]
+typeNames = [ (TInt, "SingularHorse"), (TDouble, "PairOfHorses"), (TChar, "Shetland")
+            , (TString, "SuffolkPunch"), (TBool, "Appaloosa"), (TUnit, "Unitcorn"), (TFun, "Steed") ]
+
+typeName :: Type -> String
+typeName t = maybe (show t) id (lookup t typeNames)
+
+-- Expression data type
+-- (it lives here, not in BinaryExpressions, because function values hold their body)
+data Expr = Add Expr Expr     -- add two values
+          | Sub Expr Expr     -- subtract two values
+          | Mul Expr Expr     -- multiply two values
+          | Div Expr Expr     -- divide two values
+          | Mod Expr Expr     -- find the modulus of two values
+          | Pow Expr Expr     -- find the power of two values
+          | Abs Expr          -- find the absolute value
+          | Concat Expr Expr  -- string concatination for two values
+          | And Expr Expr     -- boolean AND
+          | Nand Expr Expr    -- boolean NAND
+          | Or Expr Expr      -- boolean OR
+          | Xor Expr Expr     -- boolean XOR
+          | Nor Expr Expr     -- boolean NOR
+          | Imp Expr Expr     -- boolean IMPLIES
+          | Eq Expr Expr      -- EQUALS
+          | Not Expr          -- boolean NOT
+          | ToString Expr     -- to string
+          | ToInt Expr        -- to integer
+          | ToFloat Expr      -- to float
+          | ToBool Expr       -- to bool
+          | Electrocute Expr  -- flip the binary digits of a number
+          | Shout Expr        -- String to upper
+          | Whisper Expr      -- String to lower
+          | Val Value         -- value
+          | Var Name          -- variable support
+          | Call Expr [Expr]  -- function application: giddyup {function} with {expr} and {expr} ...
+          | Lam Type [(Type, Name)] Expr
+              -- ^ anonymous function: foal {type} ridden by {type} {param} and ... says {expr}
+          | Whinny Expr [Arm] -- case expression: whinny {expr} snort {expr} says {expr} stomp ...
+  deriving (Show, Eq)
+
+-- | One arm of a whinny: the value to match ('Nothing' for nicker, the default),
+-- the body, and whether it ends in stomp. Without a stomp, evaluation falls
+-- through into the next arm's body.
+data Arm = Arm (Maybe Expr) Expr Bool
+  deriving (Show, Eq)
+
+-- | A function value.
+data Function = Function
+  { fnReturn   :: Type            -- the type its body must evaluate to
+  , fnParams   :: [(Type, Name)]  -- its riders
+  , fnBody     :: Expr
+  , fnCaptured :: [(Name, Value)] -- riders of the function it was made inside (its closure)
+  , fnLies     :: Bool            -- it came from a lying horse, so its results are lies
+  } deriving (Eq)
+
+showFunction :: Function -> String
+showFunction f = "Steed (" ++ typeName (fnReturn f) ++ " ridden by "
+              ++ intercalate " and " [ typeName t ++ " " ++ p | (t, p) <- fnParams f ] ++ ")"
 
 instance Show Value where
   show (IntValue x) = showBinInt x
@@ -12,6 +87,7 @@ instance Show Value where
   show (BoolValue True) = "neighneigh"
   show (BoolValue False) = "neigh"
   show (ErrValue x) = x
+  show (FunValue f) = showFunction f
 
 -- BINARY NUMBER FORMAT --
 -- Numbers are written in binary, with each digit spelled out: 0 is "cl0p", 1 is "cl1p".
@@ -105,7 +181,7 @@ subValues _ (ErrValue x)                = (ErrValue x)
 subValues (IntValue x) (IntValue y)     = (IntValue (x-y))
 subValues (FloatValue x) (FloatValue y) = (FloatValue (x-y))
 subValues (FloatValue x) (IntValue y)   = (FloatValue (x-(fromIntegral(y))))
-subValues (IntValue x) (FloatValue y)   = (FloatValue (y-(fromIntegral(x))))
+subValues (IntValue x) (FloatValue y)   = (FloatValue (fromIntegral(x)-y))
 subValues _ _                           = (ErrValue "Invalid value type for: subtraction")
 
 

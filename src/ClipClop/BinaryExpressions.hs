@@ -1,55 +1,47 @@
 module ClipClop.BinaryExpressions where
 
+import ClipClop.Moods
 import ClipClop.Value
+import Control.Monad (when, zipWithM)
+import Data.List (isPrefixOf, nub)
 import Data.Map (Map)
-import Data.Char (toUpper, toLower)
+import Data.Set (Set)
+import qualified Data.Set as Set
+import Data.Char (isAlphaNum, toUpper, toLower)
 import qualified Data.Map as Map
 import Text.Parsec hiding (Empty)
 import Text.Parsec.String (Parser)
 
-type Name = String
-
--- Expression data type
-data Expr = Add Expr Expr     -- add two values
-          | Sub Expr Expr     -- subtract two values
-          | Mul Expr Expr     -- multiply two values
-          | Div Expr Expr     -- divide two values
-          | Mod Expr Expr     -- find the modulus of two values
-          | Pow Expr Expr     -- find the power of two values
-          | Abs Expr          -- find the absolute value
-          | Concat Expr Expr  -- string concatination for two values
-          | And Expr Expr     -- boolean AND
-          | Nand Expr Expr    -- boolean NAND
-          | Or Expr Expr      -- boolean OR
-          | Xor Expr Expr     -- boolean XOR
-          | Nor Expr Expr     -- boolean NOR
-          | Imp Expr Expr     -- boolean IMPLIES
-          | Eq Expr Expr      -- EQUALS
-          | Not Expr          -- boolean NOT
-          | ToString Expr     -- to string
-          | ToInt Expr        -- to integer
-          | ToFloat Expr      -- to float
-          | ToBool Expr       -- to bool
-          | Electrocute Expr  -- flip the binary digits of a number
-          | Shout Expr        -- String to upper
-          | Whisper Expr      -- String to lower
-          | Val Value         -- value
-          | Var Name          -- variable support
-  deriving Show
-
 -- Command data type
-data Command = Set Type Name Expr -- assign an expression to a variable name: the {type} {name} says {expr}
+data Command = Set Type Name [(Type, Name)] Expr
+               -- ^ assign an expression to a name: the {type} {name} says {expr}
+               -- With parameters it is short for assigning a function (see 'Lam'):
+               --   the {type} {name} ridden by {type} {param} and {type} {param} says {expr}
              | Print Expr         -- evaluate an expression and print the result
+             | Treat Name         -- treat {name}: a sulking horse stops ignoring you
+             | Interrogate Name   -- interrogate {name}: a lying horse tells the truth again
+             | Honey Name         -- honey {name}: coax back a horse that ran away
+             | MakeUp Name Name   -- makeup {name} and {name}: end a feud between two horses
   deriving Show
 
--- Variable types
-data Type = TInt     -- SingularHorse
-          | TDouble  -- PairOfHorses
-          | TChar    -- Shetland
-          | TString  -- SuffolkPunch
-          | TBool    -- Appaloosa
-          | TUnit    -- Unitcorn
-  deriving (Show, Eq)
+-- | Everything an expression is evaluated against.
+data Env = Env
+  { envVars   :: Map Name Value -- the horses (functions are horses too)
+  , envHerd   :: Herd           -- moods and feuds (see ClipClop.Moods)
+  , envLocals :: Map Name Value -- the riders, while inside a function body
+  , envDepth  :: Int            -- how many function calls deep we are
+  }
+
+emptyEnv :: Env
+emptyEnv = Env Map.empty emptyHerd Map.empty 0
+
+-- | How deep function calls may nest before the horse gives up.
+maxDepth :: Int
+maxDepth = 200
+
+-- | Is there a horse with this name?
+isHorse :: Name -> Env -> Bool
+isHorse n env = Map.member n (envVars env)
 
 -- | Check a value has the declared type, giving a type error if not.
 checkType :: Type -> Value -> Either String Value
@@ -64,24 +56,42 @@ typeOf (CharValue _)  = Just TChar
 typeOf (StrValue _)   = Just TString
 typeOf (BoolValue _)  = Just TBool
 typeOf UnitValue      = Just TUnit
+typeOf (FunValue _)   = Just TFun
 typeOf (ErrValue _)   = Nothing
 
--- | The Clip Clop name of each type.
-typeNames :: [(Type, String)]
-typeNames = [ (TInt, "SingularHorse"), (TDouble, "PairOfHorses"), (TChar, "Shetland")
-            , (TString, "SuffolkPunch"), (TBool, "Appaloosa"), (TUnit, "Unitcorn") ]
-
-typeName :: Type -> String
-typeName t = maybe (show t) id (lookup t typeNames)
-
 -- Eval is used to evaluate the expression given - recursively calls itself to evaluate the expression
-eval :: Map Name Value -> -- Variable name to value map
+eval :: Env -> -- Variables, functions and moods
         Expr -> -- Expression to evaluate
         Either String Value -- Returns either an error (such as missing variables) or the result
 eval vars (Val x) = Right x -- for values, just give the value directly 
-eval vars (Var x) = do -- variables
-                        xVal <- valueOf x vars -- find in tree
-                        return xVal    
+eval vars (Var x) = case Map.lookup x (envLocals vars) of -- variables
+                        Just v  -> Right v -- a rider: not a horse, so it has no moods
+                        Nothing -> do
+                          xVal <- valueOf x (envVars vars) -- find in tree
+                          inTheMood x vars
+                          return (asToldBy x vars xVal)
+eval vars (Lam t ps body) = -- anonymous function: remembers the riders around it
+                        Right (FunValue (Function t ps body (Map.toList (envLocals vars)) False))
+eval vars (Call f args) = do -- function application
+                        callee <- eval vars f
+                        fn <- case callee of
+                                FunValue fn  -> Right fn
+                                ErrValue err -> Left err
+                                _            -> Left (who ++ " cannot be ridden")
+                        when (length args /= length (fnParams fn)) $
+                          Left (who ++ " is ridden by " ++ show (length (fnParams fn)) ++ " but was given " ++ show (length args))
+                        when (envDepth vars >= maxDepth) $ Left (who ++ " collapsed from exhaustion")
+                        argVals <- mapM (eval vars) args
+                        riders <- zipWithM (\(t, p) v -> (,) p <$> typed t v) (fnParams fn) argVals
+                        result <- eval (mount fn riders vars) (fnBody fn) >>= typed (fnReturn fn)
+                        return (if fnLies fn then lieAbout result else result)
+  where who = case f of
+                Var x -> x
+                _     -> "a foal"
+eval vars (Whinny x arms) = do -- case expression
+                        (_, bodies) <- whinnyPath vars x arms
+                        results <- mapM (\b -> eval vars b >>= noErr) bodies
+                        return (if null results then UnitValue else last results)
 eval vars (Add x y) = do -- addition
                         xNum <- eval vars x
                         yNum <- eval vars y
@@ -239,15 +249,21 @@ concussionLines :: Int
 concussionLines = 5
 
 -- | Every electrocution side effect in an expression, in left-to-right order.
-electrocuteEffects :: Map Name Value -> Expr -> [Effect]
-electrocuteEffects vars e = concatMap (electrocuteEffects vars) (children e) ++ here e
+-- Effects inside the body of a function happen when it is successfully called.
+electrocuteEffects :: Env -> Expr -> [Effect]
+electrocuteEffects vars e = concatMap (electrocuteEffects vars) (evaluated vars e) ++ here e
   where
     here (Electrocute x) = case eval vars x of
       Right (StrValue _)  -> [KickedInHead (horseName x)]
       Right (CharValue _) -> [HorseDied (horseName x)]
       _                   -> []
+    here c@(Call f args)
+      | Right _ <- eval vars c
+      , Right (FunValue fn) <- eval vars f
+      , Right argVals <- mapM (eval vars) args
+      = electrocuteEffects (mount fn (zip (map snd (fnParams fn)) argVals) vars) (fnBody fn)
     here _ = []
-    horseName (Var n) = Just n
+    horseName (Var n) | Map.notMember n (envLocals vars) = Just n -- riders are not horses
     horseName _       = Nothing
 
 -- | The message shown for an effect.
@@ -256,7 +272,14 @@ effectMessage (KickedInHead n) = "You were kicked in the head because " ++ maybe
                               ++ " was offended! You are concussed for the next five lines."
 effectMessage (HorseDied n)    = maybe "A nameless horse" id n ++ " has died."
 
--- | The direct sub-expressions of an expression.
+-- | The sub-expressions that are actually evaluated when an expression is.
+-- Only a whinny differs from 'children': the arms it skips are never evaluated.
+evaluated :: Env -> Expr -> [Expr]
+evaluated env (Whinny x arms) = x : either (const []) (uncurry (++)) (whinnyPath env x arms)
+evaluated _   e               = children e
+
+-- | The direct sub-expressions of an expression. The body of a foal is not
+-- one of them: it is not evaluated until the foal is ridden.
 children :: Expr -> [Expr]
 children e = case e of
   Add a b -> [a, b];    Sub a b -> [a, b];  Mul a b -> [a, b];  Div a b -> [a, b]
@@ -267,21 +290,126 @@ children e = case e of
   ToFloat a -> [a];     ToBool a -> [a];    Electrocute a -> [a]
   Shout a -> [a];       Whisper a -> [a]
   Val _ -> [];          Var _ -> []
+  Call f args -> f : args
+  Lam _ _ _ -> []
+  Whinny x arms -> x : concat [ maybe [] (: []) p ++ [b] | Arm p b _ <- arms ]
 
 -- | Look a variable up in the environment.
 valueOf :: Name -> Map Name Value -> Either String Value
 valueOf x vars = maybe (Left ("variable not defined: " ++ x)) Right (Map.lookup x vars)
 
+-- | Like 'checkType', but an error value is reported as the error it holds.
+typed :: Type -> Value -> Either String Value
+typed _ (ErrValue err) = Left err
+typed t v              = checkType t v
+
+-- | An error value is reported as the error it holds.
+noErr :: Value -> Either String Value
+noErr (ErrValue err) = Left err
+noErr v              = Right v
+
+-- | The environment inside a function body: the horses, plus the riders the
+-- function captured when it was made, plus the riders it was just given.
+mount :: Function -> [(Name, Value)] -> Env -> Env
+mount fn riders env = env
+  { envLocals = Map.fromList (fnCaptured fn ++ riders) -- later entries win
+  , envDepth  = envDepth env + 1
+  }
+
+-- | Work out what a whinny evaluates: the snort values it tests, in order,
+-- and the bodies it then runs.
+--
+-- Like a C switch: the first snort equal to the whinnied value is chosen, or
+-- else the nicker; its body runs, and so does every body after it until one
+-- ends in stomp. The value of the whinny is the value of the last body run
+-- (unit if none ran). Values of different types are simply not equal.
+whinnyPath :: Env -> Expr -> [Arm] -> Either String ([Expr], [Expr])
+whinnyPath env x arms = do
+    v <- eval env x >>= noErr
+    (tested, found) <- seek v [] arms
+    return (tested, run (maybe (dropWhile isSnort arms) id found))
+  where
+    seek _ acc [] = Right (reverse acc, Nothing)
+    seek v acc (Arm Nothing _ _ : rest) = seek v acc rest
+    seek v acc (arm@(Arm (Just p) _ _) : rest) = do
+      pv <- eval env p >>= noErr
+      if pv == v then Right (reverse (p : acc), Just (arm : rest)) else seek v (p : acc) rest
+    isSnort (Arm p _ _) = p /= Nothing
+    run [] = []
+    run (Arm _ b stomp : rest) = b : if stomp then [] else run rest
+
+-- HORSE MOODS (see ClipClop.Moods) --
+
+-- | A sulking or missing horse refuses to be evaluated. (Only ever asked about
+-- horses: riders are looked up first and never get here.)
+inTheMood :: Name -> Env -> Either String ()
+inTheMood x env = case moodOf x (envHerd env) of
+  Just Sulking -> Left (x ++ " is ignoring you")
+  Just RanAway -> Left (x ++ " has run away")
+  _            -> Right ()
+
+-- | A lying horse changes the value it gives.
+asToldBy :: Name -> Env -> Value -> Value
+asToldBy x env v
+  | moodOf x (envHerd env) == Just Lying = lieAbout v
+  | otherwise                            = v
+
+-- | Every horse an expression might use, including those used inside the
+-- bodies of the function horses it mentions.
+horsesIn :: Env -> Expr -> Set Name
+horsesIn env = go Set.empty []
+  where
+    go seen riders e = case e of
+      Var x | x `elem` riders -> Set.empty
+            | otherwise       -> Set.insert x $ case Map.lookup x (envVars env) of
+                Just (FunValue fn) | x `Set.notMember` seen
+                  -> go (Set.insert x seen) (map snd (fnParams fn) ++ map fst (fnCaptured fn)) (fnBody fn)
+                _ -> Set.empty
+      Lam _ ps body -> go seen (map snd ps ++ riders) body
+      _             -> Set.unions (map (go seen riders) (children e))
+
+-- | Two feuding horses refuse to take part in the same evaluation.
+checkFeuds :: Env -> Expr -> Either String ()
+checkFeuds env e = case [ (a, b) | (a, b) <- Set.toList (herdFeuds (envHerd env))
+                                 , a `Set.member` used, b `Set.member` used ] of
+  (a, b) : _ -> Left (a ++ " and " ++ b ++ " are not speaking to each other")
+  []         -> Right ()
+  where used = horsesIn env e
+
+-- | Evaluate a whole expression as a command would: feuds first, then 'eval'.
+evalTop :: Env -> Expr -> Either String Value
+evalTop env e = checkFeuds env e >> eval env e
+
+-- COMMENTS --
+
+kwComment :: String
+kwComment = "pssssst" -- the rest of the line is a comment (exactly five s's)
+
+-- | Blank out every comment, leaving line breaks alone so that parse errors
+-- still give the right line and column. A pssssst inside a string or
+-- character literal, or on the end of a longer word, is not a comment.
+stripComments :: String -> String
+stripComments = go False
+  where
+    go _ [] = []
+    go _ ('"' : cs) = let (str, rest) = break (== '"') cs
+                      in '"' : str ++ take 1 rest ++ go False (drop 1 rest)
+    go _ ('\'' : c : '\'' : cs) = '\'' : c : '\'' : go False cs
+    go inWord s@(c : cs)
+      | not inWord, kwComment `isPrefixOf` s = let (comment, rest) = break (== '\n') s
+                                               in map (const ' ') comment ++ go False rest
+      | otherwise = c : go (isAlphaNum c) cs
+
 -- PARSING (Parsec) --
 
 -- | Parse a complete line of input as a command.
 parseCommand :: String -> Either ParseError Command
-parseCommand = parse (pCommand <* eof) "<repl>"
+parseCommand = parse (pCommand <* eof) "<repl>" . stripComments
 
 -- | Parse a block of one or more commands, e.g. several lines joined with '\'.
 -- Each command ends where the next one begins; an expression may span lines.
 parseCommands :: String -> Either ParseError [Command]
-parseCommands = parse (many1 pCommand <* eof) "<repl>"
+parseCommands = parse (many1 pCommand <* eof) "<repl>" . stripComments
 
 -- | Run a parser, then skip any trailing whitespace.
 lexeme :: Parser a -> Parser a
@@ -314,10 +442,29 @@ kwElectrocute = "electrocute" -- flip the bits of a number
 kwThe, kwSays :: String
 kwThe      = "the"            -- start of a variable declaration
 kwSays     = "says"           -- between the variable name and its value
+kwRidden, kwBy, kwAnd, kwCall, kwWith :: String
+kwRidden   = "ridden"         -- "ridden by" starts a function's parameters
+kwBy       = "by"
+kwAnd      = "and"            -- separates parameters, arguments and feuding horses
+kwCall     = "giddyup"        -- apply a function
+kwWith     = "with"           -- between a function's name and its arguments
+kwFoal, kwWhinny, kwSnort, kwNicker, kwStomp :: String
+kwFoal     = "foal"           -- an anonymous function
+kwWhinny   = "whinny"         -- switch
+kwSnort    = "snort"          -- case
+kwNicker   = "nicker"         -- default
+kwStomp    = "stomp"          -- break
+kwTreat, kwInterrogate, kwHoney, kwMakeUp :: String
+kwTreat       = "treat"       -- give a sulking horse a treat
+kwInterrogate = "interrogate" -- make a lying horse confess
+kwHoney       = "honey"       -- coax back a horse that ran away
+kwMakeUp      = "makeup"      -- force two feuding horses to make up
 
 -- | Words that cannot be used as variable names.
 reserved :: [String]
 reserved = [kwTrue, kwFalse, kwPrint, kwAbs, kwToString, kwToFloat, kwToInt, kwToBool, kwThe, kwSays, kwElectrocute, kwShout, kwWhisper]
+        ++ [kwRidden, kwBy, kwAnd, kwCall, kwWith, kwTreat, kwInterrogate, kwHoney, kwMakeUp]
+        ++ [kwFoal, kwWhinny, kwSnort, kwNicker, kwStomp]
         ++ ["duplicateHorse"] -- reserved for future use
 
 identifier :: Parser Name
@@ -327,17 +474,71 @@ identifier = try $ do
 
 -- Parse the command
 pCommand :: Parser Command
-pCommand = spaces *> (pSet <|> pPrint)
+pCommand = spaces *> (pSet <|> pHorseCare <|> pPrint)
+
+-- looking after the horses' moods
+-- treat {name} | interrogate {name} | honey {name} | makeup {name} and {name}
+pHorseCare :: Parser Command
+pHorseCare = choice
+    [ Treat       <$> (keyword kwTreat *> identifier)
+    , Interrogate <$> (keyword kwInterrogate *> identifier)
+    , Honey       <$> (keyword kwHoney *> identifier)
+    , MakeUp      <$> (keyword kwMakeUp *> identifier) <*> (keyword kwAnd *> identifier)
+    ]
 
 -- define variable or function
 -- the {type} {var name} says {expression}
+-- the {type} {function name} ridden by {type} {param} and {type} {param} says {expression}
 pSet :: Parser Command
 pSet = do
     keyword kwThe
     t <- pType
     name <- identifier
+    params <- option [] pRiders
     keyword kwSays
-    Set t name <$> pExpr
+    Set t name params <$> pExpr
+
+-- the riders (parameters) of a function
+-- ridden by {type} {param} and {type} {param}
+pRiders :: Parser [(Type, Name)]
+pRiders = do
+    keyword kwRidden
+    keyword kwBy
+    params <- sepBy1 ((,) <$> pType <*> identifier) (keyword kwAnd)
+    when (length (nub (map snd params)) /= length params) $
+      unexpected "two riders with the same name"
+    return params
+
+-- an anonymous function
+-- foal {return type} ridden by {type} {param} and {type} {param} says {expression}
+-- The body runs as far as it can, so wrap the foal in brackets to end it early.
+pLam :: Parser Expr
+pLam = Lam <$> (keyword kwFoal *> pType) <*> pRiders <*> (keyword kwSays *> pExpr)
+
+-- apply a function
+-- giddyup {function} with {expression} and {expression}
+-- The function is a name, a bracketed expression, or another giddyup.
+-- Each argument runs as far as it can, so wrap the call in brackets to use its
+-- result in a bigger expression: (giddyup double with x) + cl1p
+pCall :: Parser Expr
+pCall = Call <$> (keyword kwCall *> pFactor) <*> (keyword kwWith *> sepBy1 pExpr (keyword kwAnd))
+
+-- case expression
+-- whinny {expression}
+--   snort {expression} says {expression} stomp
+--   snort {expression} says {expression}          (no stomp: falls through)
+--   nicker says {expression} stomp
+pWhinny :: Parser Expr
+pWhinny = do
+    keyword kwWhinny
+    x <- pExpr
+    arms <- many1 pArm
+    when (length [() | Arm Nothing _ _ <- arms] > 1) $ unexpected "a second nicker"
+    return (Whinny x arms)
+  where
+    pArm = Arm <$> (snort <|> nicker) <*> (keyword kwSays *> pExpr) <*> option False (True <$ keyword kwStomp)
+    snort  = Just <$> (keyword kwSnort *> pExpr)
+    nicker = Nothing <$ keyword kwNicker
 
 pType :: Parser Type
 pType = choice [t <$ keyword n | (t, n) <- typeNames] <?> "a type"
@@ -353,7 +554,7 @@ pTerm :: Parser Expr
 pTerm = chainl1 pFactor (booleanOperators <|> concatOperator <|> modPowOperator <|> mulDivOperator <|> addSubOperator)
 
 pFactor :: Parser Expr
-pFactor = pValue <|> pVariable <|> pParenExpr
+pFactor = pValue <|> pCall <|> pLam <|> pWhinny <|> pVariable <|> pParenExpr
 
 pValue :: Parser Expr
 pValue = pBoolValue <|> pNumValue <|> pStrValue <|> pCharValue <|> pUnitValue
