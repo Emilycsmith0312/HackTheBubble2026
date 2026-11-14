@@ -16,11 +16,12 @@
 --
 --   * @CLIPCLOP_SOUNDS@  the directory holding the sound files (default: sounds)
 --   * @CLIPCLOP_PLAYER@  the command used to play a file, e.g. "mpv --no-video"
-module ClipClop.Sound (Cue, Sounds, initSounds, playCues, exprCues, textCues) where
+module ClipClop.Sound (Cue, Sounds, initSounds, playCues, finishSounds, exprCues, textCues) where
 
 import ClipClop.BinaryExpressions (children)
 import ClipClop.Value (Arm (..), Expr (..), Value (..))
 import Control.Concurrent (forkIO)
+import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.Chan (Chan, newChan, readChan, writeChan)
 import Control.Exception (IOException, try)
 import Control.Monad (filterM, forever)
@@ -35,7 +36,8 @@ import System.Process
 type Cue = String
 
 -- | A handle on the sound system: a queue of cues waiting to be played.
-newtype Sounds = Sounds (Chan Cue)
+-- ('Left' is a request to be told when everything queued before it has played.)
+newtype Sounds = Sounds (Chan (Either (MVar ()) Cue))
 
 -- CUES --
 
@@ -54,6 +56,9 @@ cueOf e = case e of
   Whisper _             -> ["quietdown"]
   Abs _                 -> ["geld"]
   Call _ _              -> ["giddyup"]
+  Stampede _ _          -> ["stampede"]
+  Cull _ _              -> ["cull"]
+  Roundup _ _ _         -> ["roundup"]
   Whinny _ arms         -> "whinny" : concat [ maybe "nicker" (const "snort") p : ["stomp" | stomp]
                                              | Arm p _ stomp <- arms ]
   _                     -> []
@@ -104,14 +109,23 @@ initSounds = do
   found <- findPlayers
   queue <- newChan
   _ <- forkIO . forever $ do
-    cue  <- readChan queue
-    file <- findSound dir cue
-    maybe (return ()) (playWith found) file
+    next <- readChan queue
+    case next of
+      Left done -> putMVar done ()
+      Right cue -> findSound dir cue >>= maybe (return ()) (playWith found)
   return (Sounds queue)
 
 -- | Queue some cues to be played in order. Returns immediately.
 playCues :: Sounds -> [Cue] -> IO ()
-playCues (Sounds queue) = mapM_ (writeChan queue)
+playCues (Sounds queue) = mapM_ (writeChan queue . Right)
+
+-- | Wait until every cue queued so far has finished playing. Without this a
+-- program that exits straight away takes its sounds with it.
+finishSounds :: Sounds -> IO ()
+finishSounds (Sounds queue) = do
+  done <- newEmptyMVar
+  writeChan queue (Left done)
+  takeMVar done
 
 -- | The installed players, or just the one named by CLIPCLOP_PLAYER.
 findPlayers :: IO [Player]

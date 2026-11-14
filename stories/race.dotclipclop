@@ -1,0 +1,33 @@
+pssssst THE RACE
+pssssst Three horses, ten laps. Run it again for a different winner.
+pssssst
+pssssst Each lap, each horse adds its stride (one) to its distance. But:
+pssssst   a horse that sulks or runs away stops moving, and nobody cures it;
+pssssst   a horse that starts lying claims a stride of two, and gets away with it;
+pssssst   a horse that falls out with its own distance refuses to add to it;
+pssssst   and if the lap counter itself gets in a mood, the race is abandoned.
+
+the SingularHorse dobbin says cl1p
+the SingularHorse trigger says cl1p
+the SingularHorse binky says cl1p
+
+the SingularHorse dobbinran says cl0p
+the SingularHorse triggerran says cl0p
+the SingularHorse binkyran says cl0p
+
+the SingularHorse laps says cl1pcl0pcl1pcl0p
+lunge laps \
+  the SingularHorse dobbinran says dobbinran + dobbin \
+  the SingularHorse triggerran says triggerran + trigger \
+  the SingularHorse binkyran says binkyran + binky \
+whoa
+
+pssssst How far each horse got. An honest race is ten each (cl1pcl0pcl1pcl0p).
+pssssst The distances are horses too, and may not want to talk about it.
+"Dobbin, Trigger, Binky:"
+dobbinran
+triggerran
+binkyran
+
+pssssst laps left to run when the race stopped (cl0p if it finished)
+laps

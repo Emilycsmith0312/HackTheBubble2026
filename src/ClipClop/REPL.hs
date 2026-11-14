@@ -3,11 +3,11 @@
 -- Line editing (arrow keys, history, Ctrl-R, emacs keys, tab completion of
 -- commands) comes from haskeline. Enter runs the line. Pasting several lines
 -- runs them one after another. Ctrl-C cancels the line, Ctrl-D quits.
-module ClipClop.REPL (repl) where
+module ClipClop.REPL (repl, runStories) where
 
 import ClipClop.BinaryExpressions
 import ClipClop.Moods
-import ClipClop.Sound (Sounds, exprCues, initSounds, playCues, textCues)
+import ClipClop.Sound (Sounds, exprCues, finishSounds, initSounds, playCues, textCues)
 import ClipClop.Value
 import Control.Exception (IOException, try)
 import Control.Monad (foldM)
@@ -43,12 +43,27 @@ repl = do
         { complete    = completer
         , historyFile = Just (home ++ "/.clipclop_history")
         }
+  st <- newState
+  runInputT settings . withInterrupt $ do
+    outputStrLn "\nClip Clop REPL. Type :help for commands, :shoo or :q to quit.\n"
+    loop st
+
+-- | A fresh state: no horses, moods seeded from the clock.
+newState :: IO ReplState
+newState = do
   seed <- round . (* 1000000) <$> getPOSIXTime
   isCalm <- (/= Nothing) <$> lookupEnv "CLIPCLOP_CALM"
   snd' <- initSounds
-  runInputT settings . withInterrupt $ do
-    outputStrLn "\nClip Clop REPL. Type :help for commands, :shoo or :q to quit.\n"
-    loop (ReplState emptyEnv 0 (mkGen seed) isCalm snd' [])
+  return (ReplState emptyEnv 0 (mkGen seed) isCalm snd' [])
+
+-- | Run story files without the REPL, one after another with the same horses
+-- (this is what @bubble2026 FILE...@ does), then wait for the sounds to finish.
+runStories :: [FilePath] -> IO ()
+runStories files = do
+  hSetBuffering stdout NoBuffering
+  st <- newState
+  st' <- foldM readStory st files
+  finishSounds (sounds st')
 
 ------------------------------------------------------------------------------
 -- The loop and the : commands
@@ -178,6 +193,8 @@ helpText = unlines
   , "  foal TYPE ridden by TYPE A says EXPR             a horse too young to have a name"
   , "  whinny EXPR snort EXPR says EXPR stomp nicker says EXPR stomp"
   , "  lunge NAME COMMAND COMMAND ... whoa              go round in circles until NAME says cl0p"
+  , "  herd of EXPR and EXPR, paddock, leader, stragglers, headcount, cut N from HERD"
+  , "  stampede F through HERD, cull F from HERD, roundup F from START through HERD"
   , "  readStory \"FILE.dotclipclop\"                    run each line of a story file"
   , "  pssssst the rest of the line is a secret"
   , "Horse care"

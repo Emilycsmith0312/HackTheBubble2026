@@ -1,0 +1,113 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Clip Clop",
+  "scopeName": "source.clipclop",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#string" },
+    { "include": "#character" },
+    { "include": "#declaration" },
+    { "include": "#rider" },
+    { "include": "#number" },
+    { "include": "#boolean" },
+    { "include": "#unit" },
+    { "include": "#type" },
+    { "include": "#control" },
+    { "include": "#definition-keyword" },
+    { "include": "#horse-care" },
+    { "include": "#builtin" },
+    { "include": "#reserved" },
+    { "include": "#operator" },
+    { "include": "#continuation" },
+    { "include": "#horse" }
+  ],
+  "repository": {
+    "comment": {
+      "comment": "pssssst (exactly five s's) to the end of the line, unless it is the tail of a longer word",
+      "name": "comment.line.pssssst.clipclop",
+      "match": "(?<![A-Za-z0-9])pssssst.*$"
+    },
+    "string": {
+      "comment": "no escapes: a string runs to the next double quote",
+      "name": "string.quoted.double.clipclop",
+      "begin": "\"",
+      "end": "\"",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.clipclop" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.clipclop" } }
+    },
+    "character": {
+      "name": "string.quoted.single.clipclop",
+      "match": "'[^']'"
+    },
+    "declaration": {
+      "comment": "the TYPE NAME ... : colour the horse being named",
+      "match": "\\b(the)\\s+(SingularHorse|PairOfHorses|Shetland|SuffolkPunch|Appaloosa|Unitcorn|Steed|Herd)\\s+([a-z][A-Za-z0-9]*)\\b",
+      "captures": {
+        "1": { "name": "keyword.other.declaration.clipclop" },
+        "2": { "name": "support.type.clipclop" },
+        "3": { "name": "entity.name.function.clipclop" }
+      }
+    },
+    "rider": {
+      "comment": "TYPE NAME after 'ridden by' or 'and': a rider (parameter)",
+      "match": "\\b(SingularHorse|PairOfHorses|Shetland|SuffolkPunch|Appaloosa|Unitcorn|Steed|Herd)\\s+(?!ridden\\b)([a-z][A-Za-z0-9]*)\\b",
+      "captures": {
+        "1": { "name": "support.type.clipclop" },
+        "2": { "name": "variable.parameter.clipclop" }
+      }
+    },
+    "number": {
+      "comment": "binary, one word per digit: cl1p is 1, cl0p is 0",
+      "name": "constant.numeric.clipclop",
+      "match": "(?<![A-Za-z0-9])-?(?:cl[01]p)+(?:\\.(?:cl[01]p)+)?(?![A-Za-z0-9])"
+    },
+    "boolean": {
+      "name": "constant.language.clipclop",
+      "match": "\\b(neighneigh|neigh|paddock)\\b"
+    },
+    "unit": {
+      "name": "constant.language.unit.clipclop",
+      "match": "\\(\\s*\\)"
+    },
+    "type": {
+      "name": "support.type.clipclop",
+      "match": "\\b(SingularHorse|PairOfHorses|Shetland|SuffolkPunch|Appaloosa|Unitcorn|Steed|Herd)\\b"
+    },
+    "control": {
+      "name": "keyword.control.clipclop",
+      "match": "\\b(whinny|snort|nicker|stomp|lunge|whoa|giddyup|with|and|herd|of|cut|from|stampede|through|cull|roundup)\\b"
+    },
+    "definition-keyword": {
+      "name": "keyword.other.declaration.clipclop",
+      "match": "\\b(the|says|ridden|by|foal)\\b"
+    },
+    "horse-care": {
+      "name": "keyword.other.care.clipclop",
+      "match": "\\b(treat|interrogate|honey|makeup)\\b"
+    },
+    "builtin": {
+      "name": "support.function.clipclop",
+      "match": "\\b(wellsaysomething|leader|stragglers|headcount|geld|toSuffolkPunch|amalgamare|maretosis|addSpots|speakup|quietdown|electrocute|readStory)\\b"
+    },
+    "reserved": {
+      "name": "invalid.deprecated.reserved.clipclop",
+      "match": "\\bduplicateHorse\\b"
+    },
+    "operator": {
+      "patterns": [
+        { "name": "keyword.operator.logical.clipclop", "match": "&&|!&|\\|\\||!\\||x\\||->|==|!" },
+        { "name": "keyword.operator.string.clipclop", "match": "\\+\\+" },
+        { "name": "keyword.operator.arithmetic.clipclop", "match": "[-+*/%^]" }
+      ]
+    },
+    "continuation": {
+      "comment": "a backslash at the end of a line (a comment may follow it) continues the statement",
+      "name": "constant.character.escape.continuation.clipclop",
+      "match": "\\\\(?=\\s*(?:pssssst.*)?$)"
+    },
+    "horse": {
+      "name": "variable.other.horse.clipclop",
+      "match": "\\b[a-z][A-Za-z0-9]*\\b"
+    }
+  }
+}

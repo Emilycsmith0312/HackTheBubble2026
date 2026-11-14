@@ -6,6 +6,7 @@ type Name = String
 
 data Value = IntValue Int | StrValue String | FloatValue Double | BoolValue Bool | CharValue Char | UnitValue | ErrValue String
            | FunValue Function -- a horse that must be ridden (functions are values like any other)
+           | ListValue [Value] -- a herd (list); its members can be of any types
         deriving (Eq)
 
 -- Variable types
@@ -16,12 +17,14 @@ data Type = TInt     -- SingularHorse
           | TBool    -- Appaloosa
           | TUnit    -- Unitcorn
           | TFun     -- Steed (any function, whatever its riders)
+          | THerd    -- Herd (a list, whatever its members)
   deriving (Show, Eq)
 
 -- | The Clip Clop name of each type.
 typeNames :: [(Type, String)]
 typeNames = [ (TInt, "SingularHorse"), (TDouble, "PairOfHorses"), (TChar, "Shetland")
-            , (TString, "SuffolkPunch"), (TBool, "Appaloosa"), (TUnit, "Unitcorn"), (TFun, "Steed") ]
+            , (TString, "SuffolkPunch"), (TBool, "Appaloosa"), (TUnit, "Unitcorn"), (TFun, "Steed")
+            , (THerd, "Herd") ]
 
 typeName :: Type -> String
 typeName t = maybe (show t) id (lookup t typeNames)
@@ -57,6 +60,15 @@ data Expr = Add Expr Expr     -- add two values
           | Lam Type [(Type, Name)] Expr
               -- ^ anonymous function: foal {type} ridden by {type} {param} and ... says {expr}
           | Whinny Expr [Arm] -- case expression: whinny {expr} snort {expr} says {expr} stomp ...
+          -- HERDS (lists) --
+          | HerdOf [Expr]     -- herd of {expr} and {expr} ...     (the empty herd is the value paddock)
+          | Leader Expr       -- leader {herd}: the first member
+          | Stragglers Expr   -- stragglers {herd}: every member but the first
+          | Headcount Expr    -- headcount {herd}: how many members
+          | Cut Expr Expr     -- cut {number} from {herd}: that member, counting from cl1p
+          | Stampede Expr Expr      -- stampede {function} through {herd}: map
+          | Cull Expr Expr          -- cull {function} from {herd}: remove the members it says neighneigh to
+          | Roundup Expr Expr Expr  -- roundup {function} from {start} through {herd}: fold from the left
   deriving (Show, Eq)
 
 -- | One arm of a whinny: the value to match ('Nothing' for nicker, the default),
@@ -88,6 +100,8 @@ instance Show Value where
   show (BoolValue False) = "neigh"
   show (ErrValue x) = x
   show (FunValue f) = showFunction f
+  show (ListValue []) = "paddock"
+  show (ListValue xs) = "herd of " ++ intercalate " and " (map show xs)
 
 -- BINARY NUMBER FORMAT --
 -- Numbers are written in binary, with each digit spelled out: 0 is "cl0p", 1 is "cl1p".
@@ -153,6 +167,10 @@ electrocuteValues (FloatValue x)
   | otherwise = FloatValue (flipFloat x)
   where flipFloat v = let (w, f) = floatBits v
                       in fromRational (fromInteger (bitsToInt (map not w)) + bitsToFrac (map not f))
+electrocuteValues (ListValue xs)        = case [e | e@(ErrValue _) <- shocked] of -- the whole herd gets it
+                                            e : _ -> e
+                                            []    -> ListValue shocked
+  where shocked = map electrocuteValues xs
 electrocuteValues _                     = ErrValue "Invalid value type for: electrocute"
 
 -- | Value of a list of binary digits (most significant first).
@@ -235,6 +253,7 @@ concatValues                    :: Value -> Value -> Value
 concatValues (ErrValue x) _             = (ErrValue x)
 concatValues _ (ErrValue x)             = (ErrValue x)
 concatValues (StrValue x) (StrValue y)  = StrValue (x ++ y)
+concatValues (ListValue x) (ListValue y) = ListValue (x ++ y) -- two herds merge
 concatValues _ _ = (ErrValue "Invalid value type for: string concatination")
 
 -- BOOLEAN ARGUMENTS -- 
@@ -281,6 +300,7 @@ eqValues (BoolValue x) (BoolValue y)    = BoolValue (x == y)
 eqValues (StrValue x) (StrValue y)      = BoolValue (x == y)
 eqValues (IntValue x) (IntValue y)      = BoolValue (x == y)
 eqValues (FloatValue x) (FloatValue y)  = BoolValue (x == y)
+eqValues (ListValue x) (ListValue y)    = BoolValue (x == y)
 eqValues _ _                            = (ErrValue "Invalid value type for: boolean EQUALS")
 
 notValues                       :: Value -> Value

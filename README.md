@@ -8,6 +8,7 @@ Horses have moods. You will not enjoy this.
 
 ```
 cabal run bubble2026     # start the REPL
+cabal run -v0 bubble2026 -- stories/fact.dotclipclop    # run a story and exit
 cabal test               # run the tests
 ```
 
@@ -20,6 +21,7 @@ cabal test               # run the tests
 - [Operators](#operators)
 - [Keyword operators](#keyword-operators)
 - [Functions](#functions)
+- [Herds (lists)](#herds-lists)
 - [Whinny (case expressions)](#whinny-case-expressions)
 - [Lunging (loops)](#lunging-loops)
 - [Stories (running files)](#stories-running-files)
@@ -27,6 +29,8 @@ cabal test               # run the tests
 - [Moods](#moods)
 - [Sound effects](#sound-effects)
 - [The REPL](#the-repl)
+- [Example stories](#example-stories)
+- [VS Code](#vs-code)
 - [Reserved words](#reserved-words)
 
 ## A quick ride
@@ -67,6 +71,7 @@ word (`xpssssst`), is not a comment.
 | `Appaloosa`     | boolean  | `neighneigh` (true), `neigh` (false)      |
 | `Unitcorn`      | unit     | `()`                                      |
 | `Steed`         | function | see [Functions](#functions)               |
+| `Herd`          | list     | `herd of cl1p and cl0p`, `paddock` (empty); see [Herds](#herds-lists) |
 
 ### Numbers
 
@@ -103,12 +108,12 @@ the Appaloosa happy says neighneigh
 - The expression must have the declared type, or the horse is not created.
 - Saying the same thing again with a new value replaces the old one.
 
-An expression on its own is printed. `saysomethinggirl` in front does the same
+An expression on its own is printed. `wellsaysomething` in front does the same
 thing, more politely:
 
 ```
 a + cl1p
-saysomethinggirl a + cl1p
+wellsaysomething a + cl1p
 ```
 
 ## Operators
@@ -121,14 +126,14 @@ saysomethinggirl a + cl1p
 | `/`      | divide           | numbers; two integers give a float unless exact |
 | `%`      | modulus          | integers                                        |
 | `^`      | power            | number to an integer power                      |
-| `++`     | join             | strings                                         |
+| `++`     | join             | two strings, or two herds                       |
 | `&&`     | and              | booleans                                        |
 | `!&`     | nand             | booleans                                        |
 | `\|\|`   | or               | booleans                                        |
 | `!\|`    | nor              | booleans                                        |
 | `x\|`    | xor              | booleans                                        |
 | `->`     | implies          | booleans                                        |
-| `==`     | equals           | two numbers of the same type, strings, booleans |
+| `==`     | equals           | two numbers of the same type, strings, booleans, herds |
 | `!`      | not (prefix)     | booleans                                        |
 
 **There is no precedence.** Every binary operator is evaluated strictly left to
@@ -148,9 +153,10 @@ not follow an operator: write `a + (geld b)`, not `a + geld b`.
 | `amalgamare`      | convert to an integer (strings must hold a `cl1p`/`cl0p` number)     |
 | `maretosis`       | convert to a float                                                   |
 | `addSpots`        | convert to a boolean (zero is `neigh`, anything else `neighneigh`)   |
-| `speakupgirl`     | upper case a string (numbers become `CL1PCL0P`)                      |
-| `quietdowngirl`   | lower case a string (numbers are whispered in decimal)               |
+| `speakup`         | upper case a string (numbers become `CL1PCL0P`)                      |
+| `quietdown`       | lower case a string (numbers are whispered in decimal)               |
 | `electrocute`     | see [Electrocution](#electrocution)                                  |
+| `leader`, `stragglers`, `headcount` | see [Herds](#herds-lists)                          |
 | `!`               | boolean not                                                          |
 
 ## Functions
@@ -227,6 +233,62 @@ The function after `giddyup` can be a name, a bracketed expression, or another
 giddyup giddyup adder with a with cl1p   pssssst (adder a) 1
 giddyup (foal SingularHorse ridden by SingularHorse q says q) with a
 ```
+
+## Herds (lists)
+
+A list is a herd. A herd has the type `Herd`, whatever is in it, and it can
+hold values of different types, including other herds and functions.
+
+```
+the Herd h says herd of cl1pcl1p and cl1p and cl1pcl0p
+the Herd nobody says paddock
+```
+
+| Syntax                                  | Meaning |
+|-----------------------------------------|---------|
+| `herd of A and B and C`                 | a herd of those values |
+| `paddock`                               | the empty herd |
+| `leader H`                              | the first member |
+| `stragglers H`                          | everything but the first member |
+| `headcount H`                           | how many members |
+| `cut N from H`                          | member number `N` |
+| `H ++ H`                                | two herds merged into one |
+| `H == H`                                | are two herds the same? |
+| `stampede F through H`                  | map: a herd of what `F` says about each member |
+| `cull F from H`                         | filter: **removes** the members `F` says `neighneigh` to |
+| `roundup F from START through H`        | fold from the left: `F` is ridden by the total so far and the next member |
+
+```
+leader h                                 pssssst cl1pcl1p
+stragglers h                             pssssst herd of cl1p and cl1pcl0p
+cut cl1pcl0p from h                      pssssst cl1p
+
+the SingularHorse double ridden by SingularHorse x says x + x
+stampede double through h                pssssst herd of cl1pcl1pcl0p and cl1pcl0p and cl1pcl0pcl0p
+
+cull (foal Appaloosa ridden by SingularHorse x says x == cl1p) from h
+                                         pssssst herd of cl1pcl1p and cl1pcl0p
+
+the SingularHorse add ridden by SingularHorse total and SingularHorse x says total + x
+roundup add from cl0p through h          pssssst cl1pcl1pcl0p
+```
+
+- **Horses are counted from `cl1p`.** `cut cl0p from h` is an error.
+- **`cull` is the opposite of a filter:** it gets rid of the members the
+  function approves of.
+- **Everything runs as far as it can.** In `herd of a and b ++ h` the second
+  member is `b ++ h`, which is an error unless `b` is itself a herd. To add to
+  the front of a herd write `(herd of a) ++ h`. Each part of `cut`, `stampede`, `cull` and `roundup` runs
+  up to its next keyword, and the last part runs to the end, so put brackets
+  round the whole thing to use it inside something bigger.
+- `leader`, `stragglers` and `headcount` are [keyword operators](#keyword-operators):
+  `headcount h + cl1p` is a type error; write `(headcount h) + cl1p`.
+- `leader paddock` and `stragglers paddock` are errors. To see whether a herd is
+  empty, whinny it: `whinny h snort paddock says ... stomp nicker says ...`.
+- A herd inside a herd needs brackets: `herd of (herd of a and b) and c`.
+- Electrocuting a herd electrocutes every member.
+- A herd horse has [moods](#moods) like any other. A lying herd lines up
+  backwards.
 
 ## Whinny (case expressions)
 
@@ -355,6 +417,10 @@ readStory tale
 - Everything the story does stays done: its horses are your horses afterwards,
   and their moods change as usual while it is read.
 - A story can read other stories, but not one that is already being read.
+- To run stories without the REPL, give them to the program:
+  `cabal run -v0 bubble2026 -- one.dotclipclop two.dotclipclop`. They run in
+  order with the same horses, and the program waits for the sounds to finish
+  before it exits.
 - If the name comes from a horse, that horse has to be in the mood to tell you.
   A lying horse gives the name backwards.
 
@@ -368,6 +434,7 @@ readStory tale
 | boolean          | it is flipped |
 | string           | nothing happens to the string, but the horse is offended and **kicks you in the head**. You are concussed for the next five lines, and everything printed comes out backwards. |
 | character        | the result is `()`, and if it was a horse, **the horse dies** and no longer exists. |
+| herd             | every member is electrocuted as above (but nobody is kicked and nothing dies) |
 
 Electrocutions inside a function happen when the function is ridden.
 
@@ -391,7 +458,7 @@ changes mood. Function horses have moods too. Nothing tells you when it happens.
 - A lying function horse gives a function whose every result is a lie. Storing
   it under another name stores the liar.
 - Lies: integers and floats are one too big, booleans are flipped, strings are
-  backwards, characters are the next character.
+  backwards, characters are the next character, herds are in reverse order.
 - Moods belong to the name. Giving the horse a new value does not cure it.
 - Riders are not horses and have no moods.
 
@@ -436,16 +503,59 @@ list of names and how to add more.
   Ctrl-C to cancel the line, Ctrl-D to quit.
 - Pasting several lines runs them one after another.
 
+## Example stories
+
+The [`stories`](stories) folder has stories to run and to steal from:
+
+```
+cabal run -v0 bubble2026 -- stories/sort.dotclipclop
+```
+
+| Story                         | What it shows |
+|-------------------------------|---------------|
+| `fact.dotclipclop`            | factorial: recursion and a whinny |
+| `fibonacci.dotclipclop`       | Fibonacci with two base cases, stampeded through a herd |
+| `gcd.dotclipclop`             | Euclid's algorithm, and a lowest common multiple |
+| `sort.dotclipclop`            | quicksort on a herd, with `cull` and closures, and how to compare numbers in a language with no "less than" |
+| `primes.dotclipclop`          | trial division, nested whinnies, fallthrough, and a `lunge` that builds a herd |
+| `fizzbuzz.dotclipclop`        | FizzBuzz, told backwards by a `lunge` |
+| `herds.dotclipclop`           | a tour of the herd operations: map, filter, sum, maximum, reverse |
+| `unreliable.dotclipclop`      | **moods:** one horse asked the same question twelve times, a lie that gets written down, the cures, and a feud |
+| `race.dotclipclop`            | **moods:** three horses race for ten laps; sulkers stop, liars cheat, and the winner changes every run |
+| `electrocution.dotclipclop`   | what electrocution does to each kind of horse, including the concussion |
+
+The moods are real in every story, so the algorithm stories will sometimes
+print an error or a wrong answer. That is the language working. Set
+`CLIPCLOP_CALM=1` to see what was supposed to happen, and run
+`unreliable.dotclipclop` and `race.dotclipclop` several times without it.
+
+## VS Code
+
+The [`vscode-clipclop`](vscode-clipclop) folder is a VS Code extension that
+gives `.dotclipclop` files syntax highlighting, snippets, and a ▶ button that
+runs the story with this cabal project.
+
+```
+cd vscode-clipclop
+python3 package.py
+code --install-extension clipclop-0.2.0.vsix
+```
+
+Reload VS Code, open the repository folder, open a story such as
+`stories/fact.dotclipclop`, and press ▶ (or `Ctrl+Alt+H`). See
+[`vscode-clipclop/README.md`](vscode-clipclop/README.md) for the settings.
+
 ## Reserved words
 
 These cannot be used as horse names:
 
 ```
-the says saysomethinggirl neigh neighneigh
-geld toSuffolkPunch amalgamare maretosis addSpots speakupgirl quietdowngirl electrocute
+the says wellsaysomething neigh neighneigh
+geld toSuffolkPunch amalgamare maretosis addSpots speakup quietdown electrocute
 ridden by and giddyup with foal
 whinny snort nicker stomp
 lunge whoa
+herd of paddock leader stragglers headcount cut from stampede through cull roundup
 readStory
 treat interrogate honey makeup
 duplicateHorse

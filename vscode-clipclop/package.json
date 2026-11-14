@@ -1,0 +1,122 @@
+{
+  "name": "clipclop",
+  "displayName": "Clip Clop",
+  "description": "Syntax highlighting and a run button for Clip Clop stories (.dotclipclop), the horse language.",
+  "version": "0.2.0",
+  "publisher": "hackthebubble",
+  "engines": {
+    "vscode": "^1.64.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:clipclop",
+    "onCommand:clipclop.runStory",
+    "onCommand:clipclop.openRepl"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "clipclop",
+        "aliases": [
+          "Clip Clop",
+          "clipclop"
+        ],
+        "extensions": [
+          ".dotclipclop"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/dotclipclop.svg",
+          "dark": "./icons/dotclipclop.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "clipclop",
+        "scopeName": "source.clipclop",
+        "path": "./syntaxes/clipclop.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "clipclop",
+        "path": "./snippets/clipclop.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "clipclop.runStory",
+        "title": "Run Story",
+        "category": "Clip Clop",
+        "icon": "$(play)"
+      },
+      {
+        "command": "clipclop.openRepl",
+        "title": "Open REPL",
+        "category": "Clip Clop"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "clipclop.runStory",
+          "when": "resourceLangId == clipclop",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "clipclop.runStory",
+          "when": "resourceLangId == clipclop",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "clipclop.runStory",
+          "when": "resourceExtname == .dotclipclop",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "clipclop.runStory",
+          "when": "editorLangId == clipclop"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "clipclop.runStory",
+        "key": "ctrl+alt+h",
+        "mac": "cmd+alt+h",
+        "when": "editorLangId == clipclop"
+      }
+    ],
+    "configuration": {
+      "title": "Clip Clop",
+      "properties": {
+        "clipclop.projectPath": {
+          "type": "string",
+          "default": "",
+          "description": "Folder containing the Clip Clop cabal project (the one with bubble2026.cabal). Leave empty to look for it in the open workspace folders and in the folders above the story."
+        },
+        "clipclop.runCommand": {
+          "type": "string",
+          "default": "cabal run -v0 bubble2026 --",
+          "description": "Command that runs Clip Clop, started in the project folder. The story's path is added on the end. To skip cabal, put the path of a built bubble2026 executable here."
+        },
+        "clipclop.calm": {
+          "type": "boolean",
+          "default": false,
+          "description": "Keep the horses calm (no random moods) when running from VS Code. Sets CLIPCLOP_CALM."
+        }
+      }
+    }
+  }
+}

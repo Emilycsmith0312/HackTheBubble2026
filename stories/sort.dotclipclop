@@ -1,0 +1,28 @@
+pssssst QUICKSORT
+pssssst Take the leader of the herd as the pivot, cull the stragglers into the
+pssssst small ones and the big ones, sort each lot, and merge the herds.
+pssssst Horses have moods: run with CLIPCLOP_CALM=1 to see what was supposed to happen.
+pssssst (A lying herd lines up backwards, which is a bad day for a sorting algorithm.)
+
+pssssst Clip Clop has no "less than". But geld (absolute value) leaves a number
+pssssst alone exactly when it is not negative, so a >= b when geld (a - b) == a - b.
+the Appaloosa atleast ridden by SingularHorse a and SingularHorse b says \
+  (geld (a - b)) == (a - b)
+
+pssssst cull removes the horses the foal says neighneigh to:
+pssssst   culling the ones at least as big as the leader leaves the small ones,
+pssssst   culling the ones that are not leaves the big ones.
+the Herd sort ridden by Herd h says \
+  whinny h \
+    snort paddock says paddock stomp \
+    nicker says \
+      (giddyup sort with cull (foal Appaloosa ridden by SingularHorse x says giddyup atleast with x and leader h) from stragglers h) \
+      ++ (herd of leader h) \
+      ++ (giddyup sort with cull (foal Appaloosa ridden by SingularHorse x says !(giddyup atleast with x and leader h)) from stragglers h)
+
+pssssst 5 3 8 1 9 2 7
+the Herd messy says herd of cl1pcl0pcl1p and cl1pcl1p and cl1pcl0pcl0pcl0p and cl1p and cl1pcl0pcl0pcl1p and cl1pcl0p and cl1pcl1pcl1p
+messy
+
+pssssst 1 2 3 5 7 8 9
+giddyup sort with messy

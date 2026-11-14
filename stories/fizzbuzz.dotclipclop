@@ -1,0 +1,21 @@
+pssssst FIZZBUZZ
+pssssst Horses have moods: run with CLIPCLOP_CALM=1 to see what was supposed to happen.
+
+pssssst Three whinnies, one inside the other, each in its own brackets.
+the SuffolkPunch fizzbuzz ridden by SingularHorse n says \
+  whinny n % cl1pcl1pcl1pcl1p \
+    snort cl0p says "FizzBuzz" stomp \
+    nicker says (whinny n % cl1pcl1p \
+      snort cl0p says "Fizz" stomp \
+      nicker says (whinny n % cl1pcl0pcl1p \
+        snort cl0p says "Buzz" stomp \
+        nicker says toSuffolkPunch n))
+
+pssssst A lunge counts down from fifteen, so the story is told backwards
+pssssst and put together forwards.
+the SingularHorse n says cl1pcl1pcl1pcl1p
+the Herd said says paddock
+lunge n \
+  the Herd said says (herd of giddyup fizzbuzz with n) ++ said \
+whoa
+said

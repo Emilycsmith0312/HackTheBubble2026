@@ -2,7 +2,7 @@ module ClipClop.BinaryExpressions where
 
 import ClipClop.Moods
 import ClipClop.Value
-import Control.Monad (when, zipWithM)
+import Control.Monad (foldM, when, zipWithM)
 import Data.List (isPrefixOf, nub)
 import Data.Map (Map)
 import Data.Set (Set)
@@ -62,6 +62,7 @@ typeOf (StrValue _)   = Just TString
 typeOf (BoolValue _)  = Just TBool
 typeOf UnitValue      = Just TUnit
 typeOf (FunValue _)   = Just TFun
+typeOf (ListValue _)  = Just THerd
 typeOf (ErrValue _)   = Nothing
 
 -- Eval is used to evaluate the expression given - recursively calls itself to evaluate the expression
@@ -79,20 +80,45 @@ eval vars (Lam t ps body) = -- anonymous function: remembers the riders around i
                         Right (FunValue (Function t ps body (Map.toList (envLocals vars)) False))
 eval vars (Call f args) = do -- function application
                         callee <- eval vars f
-                        fn <- case callee of
-                                FunValue fn  -> Right fn
-                                ErrValue err -> Left err
-                                _            -> Left (who ++ " cannot be ridden")
-                        when (length args /= length (fnParams fn)) $
-                          Left (who ++ " is ridden by " ++ show (length (fnParams fn)) ++ " but was given " ++ show (length args))
-                        when (envDepth vars >= maxDepth) $ Left (who ++ " collapsed from exhaustion")
                         argVals <- mapM (eval vars) args
-                        riders <- zipWithM (\(t, p) v -> (,) p <$> typed t v) (fnParams fn) argVals
-                        result <- eval (mount fn riders vars) (fnBody fn) >>= typed (fnReturn fn)
-                        return (if fnLies fn then lieAbout result else result)
-  where who = case f of
-                Var x -> x
-                _     -> "a foal"
+                        ride vars (nameOf f) callee argVals
+-- HERDS (lists) --
+eval vars (HerdOf xs) = ListValue <$> mapM (\x -> eval vars x >>= noErr) xs
+eval vars (Leader h) = do
+                        xs <- herdOf "leader" vars h
+                        case xs of
+                          x : _ -> Right x
+                          []    -> Left "the paddock is empty: nobody is the leader"
+eval vars (Stragglers h) = do
+                        xs <- herdOf "stragglers" vars h
+                        case xs of
+                          _ : rest -> Right (ListValue rest)
+                          []       -> Left "the paddock is empty: there are no stragglers"
+eval vars (Headcount h) = IntValue . length <$> herdOf "headcount" vars h
+eval vars (Cut n h) = do -- the first member is number cl1p
+                        place <- eval vars n
+                        xs <- herdOf "cut" vars h
+                        case place of
+                          IntValue k | k >= 1 && k <= length xs -> Right (xs !! (k - 1))
+                                     | otherwise -> Left ("there is no horse number " ++ show place ++ " in a herd of " ++ show (IntValue (length xs)))
+                          ErrValue err -> Left err
+                          _ -> Left ("horses are counted with a " ++ typeName TInt)
+eval vars (Stampede f h) = do -- map
+                        fn <- eval vars f
+                        xs <- herdOf "stampede" vars h
+                        ListValue <$> mapM (\x -> ride vars (nameOf f) fn [x]) xs
+eval vars (Cull f h) = do -- filter, keeping the members the function says neigh to
+                        fn <- eval vars f
+                        xs <- herdOf "cull" vars h
+                        kept <- mapM (\x -> ride vars (nameOf f) fn [x] >>= stays x) xs
+                        return (ListValue (concat kept))
+  where stays x (BoolValue gone) = Right [x | not gone]
+        stays _ _                = Left ("to cull, " ++ nameOf f ++ " must say an " ++ typeName TBool)
+eval vars (Roundup f z h) = do -- fold from the left: f (f (f start a) b) c
+                        fn <- eval vars f
+                        start <- eval vars z >>= noErr
+                        xs <- herdOf "roundup" vars h
+                        foldM (\acc x -> ride vars (nameOf f) fn [acc, x]) start xs
 eval vars (Whinny x arms) = do -- case expression
                         (_, bodies) <- whinnyPath vars x arms
                         results <- mapM (\b -> eval vars b >>= noErr) bodies
@@ -297,11 +323,44 @@ children e = case e of
   Val _ -> [];          Var _ -> []
   Call f args -> f : args
   Lam _ _ _ -> []
+  HerdOf xs -> xs
+  Leader a -> [a];      Stragglers a -> [a]; Headcount a -> [a]
+  Cut a b -> [a, b];    Stampede a b -> [a, b]; Cull a b -> [a, b]
+  Roundup a b c -> [a, b, c]
   Whinny x arms -> x : concat [ maybe [] (: []) p ++ [b] | Arm p b _ <- arms ]
 
 -- | Look a variable up in the environment.
 valueOf :: Name -> Map Name Value -> Either String Value
 valueOf x vars = maybe (Left ("variable not defined: " ++ x)) Right (Map.lookup x vars)
+
+-- | What to call a function in an error message.
+nameOf :: Expr -> String
+nameOf (Var x) = x
+nameOf _       = "a foal"
+
+-- | Ride a function value with some riders. Used by giddyup and by the herd
+-- operations that take a function.
+ride :: Env -> String -> Value -> [Value] -> Either String Value
+ride vars who callee argVals = do
+    fn <- case callee of
+            FunValue fn  -> Right fn
+            ErrValue err -> Left err
+            _            -> Left (who ++ " cannot be ridden")
+    when (length argVals /= length (fnParams fn)) $
+      Left (who ++ " is ridden by " ++ show (length (fnParams fn)) ++ " but was given " ++ show (length argVals))
+    when (envDepth vars >= maxDepth) $ Left (who ++ " collapsed from exhaustion")
+    riders <- zipWithM (\(t, p) v -> (,) p <$> typed t v) (fnParams fn) argVals
+    result <- eval (mount fn riders vars) (fnBody fn) >>= typed (fnReturn fn)
+    return (if fnLies fn then lieAbout result else result)
+
+-- | Evaluate an expression that must be a herd, for the named operation.
+herdOf :: String -> Env -> Expr -> Either String [Value]
+herdOf what vars h = do
+    v <- eval vars h
+    case v of
+      ListValue xs -> Right xs
+      ErrValue err -> Left err
+      _            -> Left (what ++ " needs a " ++ typeName THerd)
 
 -- | Like 'checkType', but an error value is reported as the error it holds.
 typed :: Type -> Value -> Either String Value
@@ -459,6 +518,20 @@ kwWhinny   = "whinny"         -- switch
 kwSnort    = "snort"          -- case
 kwNicker   = "nicker"         -- default
 kwStomp    = "stomp"          -- break
+kwHerd, kwOf, kwPaddock, kwLeader, kwStragglers, kwHeadcount, kwCut, kwFrom :: String
+kwHerd       = "herd"         -- "herd of" starts a list
+kwOf         = "of"
+kwPaddock    = "paddock"      -- the empty list
+kwLeader     = "leader"       -- head
+kwStragglers = "stragglers"   -- tail
+kwHeadcount  = "headcount"    -- length
+kwCut        = "cut"          -- index: cut {number} from {herd}
+kwFrom       = "from"
+kwStampede, kwThrough, kwCull, kwRoundup :: String
+kwStampede   = "stampede"     -- map: stampede {function} through {herd}
+kwThrough    = "through"
+kwCull       = "cull"         -- filter out: cull {function} from {herd}
+kwRoundup    = "roundup"      -- fold: roundup {function} from {start} through {herd}
 kwReadStory, storyExtension :: String
 kwReadStory    = "readStory"    -- run the lines of a story file
 storyExtension = ".dotclipclop" -- what a story file's name must end in
@@ -476,6 +549,8 @@ reserved :: [String]
 reserved = [kwTrue, kwFalse, kwPrint, kwAbs, kwToString, kwToFloat, kwToInt, kwToBool, kwThe, kwSays, kwElectrocute, kwShout, kwWhisper]
         ++ [kwRidden, kwBy, kwAnd, kwCall, kwWith, kwTreat, kwInterrogate, kwHoney, kwMakeUp]
         ++ [kwFoal, kwWhinny, kwSnort, kwNicker, kwStomp, kwLunge, kwWhoa, kwReadStory]
+        ++ [kwHerd, kwOf, kwPaddock, kwLeader, kwStragglers, kwHeadcount, kwCut, kwFrom]
+        ++ [kwStampede, kwThrough, kwCull, kwRoundup]
         ++ ["duplicateHorse"] -- reserved for future use
 
 identifier :: Parser Name
@@ -569,13 +644,41 @@ pPrint :: Parser Command
 pPrint = optional (keyword kwPrint) *> (Print <$> pExpr)
 
 pExpr :: Parser Expr
-pExpr = pAbsolute <|> pNot <|> pToString <|> pToBool <|> pToNum <|> pElectrocute <|> pTerm <|> pShout <|> pWhisper
+pExpr = pAbsolute <|> pNot <|> pToString <|> pToBool <|> pToNum <|> pElectrocute <|> pHerdPrefix <|> pTerm <|> pShout <|> pWhisper
+
+-- HERDS (lists) --
+
+-- leader / stragglers / headcount: like geld, each applies to everything after it
+pHerdPrefix :: Parser Expr
+pHerdPrefix = choice
+    [ Leader     <$> (keyword kwLeader *> pExpr)
+    , Stragglers <$> (keyword kwStragglers *> pExpr)
+    , Headcount  <$> (keyword kwHeadcount *> pExpr)
+    ]
+
+-- The herd forms with more than one part. Like giddyup, they can be used as an
+-- operand, and each part runs as far as it can (up to the next keyword).
+-- herd of {expression} and {expression}
+-- paddock
+-- cut {number} from {herd}
+-- stampede {function} through {herd}
+-- cull {function} from {herd}
+-- roundup {function} from {start} through {herd}
+pHerd :: Parser Expr
+pHerd = choice
+    [ HerdOf   <$> (keyword kwHerd *> keyword kwOf *> sepBy1 pExpr (keyword kwAnd))
+    , Val (ListValue []) <$ keyword kwPaddock
+    , Cut      <$> (keyword kwCut *> pExpr) <*> (keyword kwFrom *> pExpr)
+    , Stampede <$> (keyword kwStampede *> pExpr) <*> (keyword kwThrough *> pExpr)
+    , Cull     <$> (keyword kwCull *> pExpr) <*> (keyword kwFrom *> pExpr)
+    , Roundup  <$> (keyword kwRoundup *> pExpr) <*> (keyword kwFrom *> pExpr) <*> (keyword kwThrough *> pExpr)
+    ]
 
 pTerm :: Parser Expr
 pTerm = chainl1 pFactor (booleanOperators <|> concatOperator <|> modPowOperator <|> mulDivOperator <|> addSubOperator)
 
 pFactor :: Parser Expr
-pFactor = pValue <|> pCall <|> pLam <|> pWhinny <|> pVariable <|> pParenExpr
+pFactor = pValue <|> pCall <|> pLam <|> pWhinny <|> pHerd <|> pVariable <|> pParenExpr
 
 pValue :: Parser Expr
 pValue = pBoolValue <|> pNumValue <|> pStrValue <|> pCharValue <|> pUnitValue

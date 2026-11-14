@@ -68,6 +68,9 @@ lieAbout (StrValue s)
   | reverse s == s      = StrValue (s ++ "neigh") -- palindromes need a different lie
   | otherwise           = StrValue (reverse s)
 lieAbout (FunValue f)   = FunValue f { fnLies = True } -- every result it gives is a lie
+lieAbout (ListValue xs)
+  | reverse xs /= xs    = ListValue (reverse xs)      -- a lying herd lines up backwards
+  | otherwise           = ListValue (map lieAbout xs) -- or, if that shows nothing, every member lies
 lieAbout v              = v -- nothing to lie about
 
 -- RANDOMNESS --

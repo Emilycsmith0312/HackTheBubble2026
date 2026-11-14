@@ -1,0 +1,37 @@
+pssssst PRIMES
+pssssst Trial division, then a lunge to collect every prime up to twenty.
+pssssst Horses have moods: run with CLIPCLOP_CALM=1 to see what was supposed to happen.
+
+pssssst Does any number from d down to 2 divide n?
+pssssst (A whinny inside a whinny needs brackets, or the outer one loses its nicker.)
+the Appaloosa divisible ridden by SingularHorse n and SingularHorse d says \
+  whinny d \
+    snort cl1p says neigh stomp \
+    nicker says (whinny n % d \
+      snort cl0p says neighneigh stomp \
+      nicker says giddyup divisible with n and d - cl1p)
+
+pssssst 0 has no stomp, so it falls through into 1's answer.
+the Appaloosa prime ridden by SingularHorse n says \
+  whinny n \
+    snort cl0p says neigh \
+    snort cl1p says neigh stomp \
+    nicker says !(giddyup divisible with n and n - cl1p)
+
+giddyup prime with cl1pcl1pcl1p
+giddyup prime with cl1pcl0pcl0pcl1p
+
+pssssst A lunge only counts down, and uses its horse up. Counting down is just
+pssssst what we want here: each prime goes on the front, so the herd ends up in order.
+the SingularHorse n says cl1pcl0pcl1pcl0pcl0p
+the Herd primes says paddock
+lunge n \
+  the Herd primes says whinny (giddyup prime with n) \
+    snort neighneigh says (herd of n) ++ primes stomp \
+    nicker says primes \
+whoa
+
+pssssst 2 3 5 7 11 13 17 19
+primes
+pssssst n has been used up
+n

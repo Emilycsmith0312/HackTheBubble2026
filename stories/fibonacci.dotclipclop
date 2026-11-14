@@ -1,0 +1,17 @@
+pssssst FIBONACCI
+pssssst Recursion with two base cases, then stampeded through a herd.
+pssssst Horses have moods: if a line fails or looks wrong, that is the horse, not you.
+pssssst Run with CLIPCLOP_CALM=1 to see what was supposed to happen.
+
+the SingularHorse fib ridden by SingularHorse n says \
+  whinny n \
+    snort cl0p says cl0p stomp \
+    snort cl1p says cl1p stomp \
+    nicker says (giddyup fib with n - cl1p) + (giddyup fib with n - cl1pcl0p)
+
+pssssst the tenth Fibonacci number: 55
+giddyup fib with cl1pcl0pcl1pcl0p
+
+pssssst the first eight, all at once: 0 1 1 2 3 5 8 13
+the Herd places says herd of cl0p and cl1p and cl1pcl0p and cl1pcl1p and cl1pcl0pcl0p and cl1pcl0pcl1p and cl1pcl1pcl0p and cl1pcl1pcl1p
+stampede fib through places

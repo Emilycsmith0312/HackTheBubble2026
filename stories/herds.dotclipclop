@@ -1,0 +1,35 @@
+pssssst A TOUR OF THE HERD
+pssssst Map, filter and fold, which here are stampede, cull and roundup.
+pssssst Horses have moods: run with CLIPCLOP_CALM=1 to see what was supposed to happen.
+
+pssssst 3 1 4 1 5 9 2 6
+the Herd h says herd of cl1pcl1p and cl1p and cl1pcl0pcl0p and cl1p and cl1pcl0pcl1p and cl1pcl0pcl0pcl1p and cl1pcl0p and cl1pcl1pcl0p
+
+pssssst how many, the first, the rest, and the third (horses are counted from cl1p)
+headcount h
+leader h
+stragglers h
+cut cl1pcl1p from h
+
+pssssst stampede: square every horse
+stampede (foal SingularHorse ridden by SingularHorse x says x * x) through h
+
+pssssst cull: get rid of the odd ones
+cull (foal Appaloosa ridden by SingularHorse x says (x % cl1pcl0p) == cl1p) from h
+
+pssssst roundup: add them all up (31)
+the SingularHorse add ridden by SingularHorse total and SingularHorse x says total + x
+roundup add from cl0p through h
+
+pssssst roundup: the biggest (9). No "less than" here either: see sort.dotclipclop.
+the SingularHorse bigger ridden by SingularHorse a and SingularHorse b says \
+  whinny (geld (a - b)) == (a - b) \
+    snort neighneigh says a stomp \
+    nicker says b
+roundup bigger from leader h through stragglers h
+
+pssssst roundup: turn the herd round, by putting each horse in front of the last
+roundup (foal Herd ridden by Herd sofar and SingularHorse x says (herd of x) ++ sofar) from paddock through h
+
+pssssst a herd can hold anything, including other herds
+herd of "a string" and 'c' and neighneigh and (herd of cl1p and cl0p) and paddock

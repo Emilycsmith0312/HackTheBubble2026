@@ -13,6 +13,9 @@ it plays whenever that cue happens. Missing files are simply skipped.
 | `whisper`     | `quietdowngirl ...`                                    |
 | `geld`        | `geld ...`                                             |
 | `giddyup`     | a function is ridden (`giddyup ... with ...`)          |
+| `stampede`    | `stampede ... through ...`                             |
+| `cull`        | `cull ... from ...`                                    |
+| `roundup`     | `roundup ... from ... through ...`                     |
 | `whinny`      | a `whinny` is evaluated                                |
 | `snort`       | once for each `snort` in that whinny                   |
 | `nicker`      | once for the `nicker` in that whinny                   |

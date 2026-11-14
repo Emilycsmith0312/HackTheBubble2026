@@ -46,6 +46,7 @@ herd = runAll $ unlines
   , "the Steed addtwo says giddyup adder with cl1pcl0p"
   , "the SingularHorse peek ridden by SingularHorse q says x"
   , "the SingularHorse leaky ridden by SingularHorse x says giddyup peek with x"
+  , "the Herd nums says herd of cl1pcl1p and cl1p and cl1pcl0p"
   , "the SingularHorse sumto ridden by SingularHorse n says whinny n snort cl0p says cl0p stomp nicker says n + giddyup sumto with n - cl1p"
   ]
 
@@ -79,6 +80,23 @@ tests =
   , ("different types",      ask herd "whinny a snort \"x\" says cl1p stomp nicker says cl0p" == Right (IntValue 0))
   , ("recursion ends",       ask herd "giddyup sumto with cl1pcl0pcl0p" == Right (IntValue 10))
   , ("two nickers",          isLeft (parseCommands "whinny a nicker says a nicker says a"))
+  -- herds
+  , ("herd literal",         ask herd "herd of a and b" == Right (ListValue [IntValue 2, IntValue 1]))
+  , ("paddock",              ask herd "paddock" == Right (ListValue []))
+  , ("leader",               ask herd "leader nums" == Right (IntValue 3))
+  , ("stragglers",           ask herd "stragglers nums" == Right (ListValue [IntValue 1, IntValue 2]))
+  , ("headcount",            ask herd "headcount nums" == Right (IntValue 3))
+  , ("cut counts from one",  ask herd "cut b from nums" == Right (IntValue 3))
+  , ("cut out of range",     isLeft (ask herd "cut cl0p from nums"))
+  , ("empty leader",         isLeft (ask herd "leader paddock"))
+  , ("merge herds",          ask herd "(herd of a) ++ nums" == Right (ListValue (map IntValue [2, 3, 1, 2])))
+  , ("stampede",             ask herd "stampede double through nums" == Right (ListValue (map IntValue [6, 2, 4])))
+  , ("cull removes",         ask herd "cull (foal Appaloosa ridden by SingularHorse x says x == a) from nums" == Right (ListValue (map IntValue [3, 1])))
+  , ("roundup",              ask herd "roundup add from a through nums" == Right (IntValue 8))
+  , ("herd equality",        ask herd "nums == (herd of cl1pcl1p and b and a)" == Right (BoolValue True))
+  , ("whinny on paddock",    ask herd "whinny stragglers herd of a snort paddock says b" == Right (IntValue 1))
+  , ("lying herd reversed",  ask (withHerd (setMood "nums" Lying) herd) "nums" == Right (ListValue (map IntValue [2, 1, 3])))
+  , ("lying stampede",       ask (withHerd (setMood "double" Lying) herd) "stampede double through nums" == Right (ListValue (map IntValue [7, 3, 5])))
   -- lunge
   , ("lunge parses",         case parseCommands "lunge a the SingularHorse b says b + a  a + b whoa a" of
                                Right [Lunge "a" [Set _ "b" [] _, Print _], Print _] -> True
@@ -111,7 +129,7 @@ tests =
   , ("moods do happen",      any (\s -> fst (stirUp names emptyHerd (mkGen s)) /= emptyHerd) [1 .. 50])
   , ("lies keep their type", and [ typeOf (lieAbout v) == typeOf v
                                  | v <- [IntValue 1, FloatValue 1, BoolValue True, CharValue 'a', StrValue "aba", StrValue "ab", UnitValue] ])
-  , ("lies are lies",        and [ lieAbout v /= v | v <- [IntValue 1, FloatValue 1, BoolValue True, CharValue 'a', StrValue "aba", StrValue "ab", StrValue ""] ])
+  , ("lies are lies",        and [ lieAbout v /= v | v <- [IntValue 1, FloatValue 1, BoolValue True, CharValue 'a', StrValue "aba", StrValue "ab", StrValue "", ListValue [IntValue 1, IntValue 2], ListValue [IntValue 1]] ])
   ]
   where
     names = ["a", "b", "double"]

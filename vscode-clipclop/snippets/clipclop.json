@@ -1,0 +1,65 @@
+{
+  "Horse": {
+    "prefix": "the",
+    "body": "the ${1|SingularHorse,PairOfHorses,Shetland,SuffolkPunch,Appaloosa,Unitcorn,Steed,Herd|} ${2:name} says ${0:cl1p}",
+    "description": "A horse that says a value"
+  },
+  "Function": {
+    "prefix": "ridden",
+    "body": "the ${1:SingularHorse} ${2:name} ridden by ${3:SingularHorse} ${4:x} says ${0:x}",
+    "description": "A horse that must be ridden (a function)"
+  },
+  "Foal": {
+    "prefix": "foal",
+    "body": "(foal ${1:SingularHorse} ridden by ${2:SingularHorse} ${3:x} says ${0:x})",
+    "description": "An anonymous function"
+  },
+  "Giddyup": {
+    "prefix": "giddyup",
+    "body": "(giddyup ${1:name} with ${0:cl1p})",
+    "description": "Ride a function"
+  },
+  "Whinny": {
+    "prefix": "whinny",
+    "body": [
+      "whinny ${1:horse} \\\\",
+      "  snort ${2:cl0p} says ${3:cl1p} stomp \\\\",
+      "  nicker says ${0:cl0p} stomp"
+    ],
+    "description": "Case expression"
+  },
+  "Lunge": {
+    "prefix": "lunge",
+    "body": [
+      "lunge ${1:horse} \\\\",
+      "  ${0} \\\\",
+      "whoa"
+    ],
+    "description": "Loop until the horse says cl0p"
+  },
+  "Read story": {
+    "prefix": "readStory",
+    "body": "readStory \"${0:tale}.dotclipclop\"",
+    "description": "Run another story"
+  },
+  "Herd": {
+    "prefix": "herd",
+    "body": "(herd of ${1:cl1p} and ${0:cl0p})",
+    "description": "A herd (list)"
+  },
+  "Stampede": {
+    "prefix": "stampede",
+    "body": "(stampede ${1:function} through ${0:herd})",
+    "description": "Map a function over a herd"
+  },
+  "Cull": {
+    "prefix": "cull",
+    "body": "(cull ${1:function} from ${0:herd})",
+    "description": "Remove the horses the function says neighneigh to"
+  },
+  "Roundup": {
+    "prefix": "roundup",
+    "body": "(roundup ${1:function} from ${2:cl0p} through ${0:herd})",
+    "description": "Fold a herd from the left"
+  }
+}
