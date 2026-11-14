@@ -1,0 +1,43 @@
+cabal-version:       2.4
+name:                bubble2026
+version:             0.1.0.0
+synopsis:            An esoteric language with a REPL (Hack the Bubble 2026)
+license-file:        LICENSE
+author:              Jake Brockwell
+maintainer:          jb457@st-andrews.ac.uk
+build-type:          Simple
+extra-source-files:  CHANGELOG.md, README.md
+
+common shared
+  default-language:  Haskell2010
+  ghc-options:       -Wall
+
+library
+  import:            shared
+  hs-source-dirs:    src
+  exposed-modules:   Bubble.Syntax
+                     Bubble.Parser
+                     Bubble.Eval
+                     Bubble.REPL
+                     Bubble.Variables
+                     Bubble.Abstractions
+                     Bubble.Applications
+                     Bubble.CaseExpressions
+  build-depends:     base >=4.14 && <5,
+                     parsec >=3.1 && <3.2
+
+executable bubble2026
+  import:            shared
+  main-is:           Main.hs
+  hs-source-dirs:    app
+  build-depends:     base >=4.14 && <5,
+                     bubble2026
+
+test-suite bubble2026-test
+  import:            shared
+  type:              exitcode-stdio-1.0
+  main-is:           Spec.hs
+  hs-source-dirs:    test
+  build-depends:     base >=4.14 && <5,
+                     parsec >=3.1 && <3.2,
+                     bubble2026
