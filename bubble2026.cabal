@@ -27,14 +27,18 @@ library
                      ClipClop.CaseExpressions
   build-depends:     base >=4.14 && <5,
                      containers,
-                     parsec >=3.1 && <3.2
+                     parsec >=3.1 && <3.2,
+                     haskeline,
+                     directory
 
 executable bubble2026
   import:            shared
   main-is:           Main.hs
   hs-source-dirs:    app
   build-depends:     base >=4.14 && <5,
-                     bubble2026
+                     bubble2026,
+                     haskeline,
+                     directory
 
 test-suite bubble2026-test
   import:            shared
@@ -43,4 +47,6 @@ test-suite bubble2026-test
   hs-source-dirs:    test
   build-depends:     base >=4.14 && <5,
                      parsec >=3.1 && <3.2,
-                     bubble2026
+                     bubble2026,
+                     haskeline,
+                     directory
