@@ -6,13 +6,13 @@
 module ClipClop.REPL (repl) where
 
 import ClipClop.BinaryExpressions
-  (Command (..), Effect (..), Expr, Name, checkType, concussionLines, effectMessage, electrocuteEffects, eval, parseCommand)
+  (Command (..), Effect (..), Expr, Name, checkType, concussionLines, effectMessage, electrocuteEffects, eval, parseCommands)
 import ClipClop.Value (Value (..))
 import Control.Exception (IOException, try)
 import Control.Monad (foldM)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char (isSpace)
-import Data.List (isPrefixOf)
+import Data.List (dropWhileEnd, intercalate, isPrefixOf)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import System.Console.Haskeline
@@ -56,7 +56,46 @@ loop st = do
   case r of
     Nothing         -> outputStrLn "^C" >> loop st   -- Ctrl-C
     Just Nothing    -> outputStrLn ""                -- Ctrl-D
-    Just (Just src) -> dispatch st src
+    Just (Just src)
+      | continues src -> continuation st [dropBackslash src]
+      | otherwise     -> dispatch st src
+
+-- | Keep reading "...>" lines while each one ends in a backslash, then run them
+-- as one block (which may hold several statements, or one statement split over
+-- lines). Ctrl-C abandons the block; Ctrl-D abandons it and quits.
+continuation :: ReplState -> [String] -> InputT IO ()
+continuation st acc = do
+  r <- handleInterrupt (return Nothing) (Just <$> getInputLine "     ...> ")
+  case r of
+    Nothing      -> outputStrLn "^C" >> loop st
+    Just Nothing -> outputStrLn "\nUnfinished definition discarded."
+    Just (Just l)
+      | continues l -> continuation st (acc ++ [dropBackslash l])
+      | otherwise   -> liftIO (run st (joinBlock (acc ++ [l]))) >>= loop
+
+-- | Does this line end in a continuation backslash (ignoring trailing spaces)?
+continues :: String -> Bool
+continues l = case dropWhileEnd isSpace l of
+  "" -> False
+  t  -> last t == '\\'
+
+-- | Remove the continuation backslash from the end of a line.
+dropBackslash :: String -> String
+dropBackslash = init . dropWhileEnd isSpace
+
+-- | Group each line ending in a backslash with the line after it into one block.
+joinContinuations :: [String] -> [String]
+joinContinuations = go []
+  where
+    go acc (l : ls)
+      | continues l = go (acc ++ [dropBackslash l]) ls
+      | otherwise   = joinBlock (acc ++ [l]) : go [] ls
+    go [] []  = []
+    go acc [] = [joinBlock acc] -- file ended mid-block: run what there is
+
+-- | Lines stay separate inside a block, so parse errors give the right line number.
+joinBlock :: [String] -> String
+joinBlock = intercalate "\n"
 
 -- | A line starting with ':' is a REPL command. Anything else is run as code,
 -- one line at a time (so pasted text containing several lines still works).
@@ -83,9 +122,10 @@ command st c args = case (c, args) of
 shoo :: ReplState -> InputT IO ()
 shoo st = liftIO (mapM_ (\name -> say st ("Bye " ++ name)) (Map.keys (vars st)))
 
--- | Run every non-blank line of the text as its own statement.
+-- | Run every non-blank line of the text as its own statement
+-- (lines ending in a backslash continue onto the next line).
 runLines :: ReplState -> String -> IO ReplState
-runLines st src = foldM run st (filter (not . all isSpace) (lines src))
+runLines st src = foldM run st (filter (not . all isSpace) (joinContinuations (lines src)))
 
 -- | Run every non-blank line of a file.
 loadFile :: ReplState -> FilePath -> InputT IO ReplState
@@ -109,11 +149,13 @@ helpText = unlines
   , "  :load FILE   run each line of FILE"
   , "  :reset       release all the horses"
   , "  :q           quit"
-  , "  shoo         say bye to every horse, then quit"
+  , "  :shoo        say bye to every horse, then quit"
   , "Keys"
   , "  up/down history, Ctrl-R search, Tab completes commands,"
   , "  Ctrl-C cancels the line you are typing, Ctrl-D quits."
   , "  Pasting several lines runs them one after another."
+  , "  End a line with \\ to keep going on the next line: one statement"
+  , "  split over several lines, or several statements run together."
   ]
 
 ------------------------------------------------------------------------------
@@ -128,20 +170,26 @@ say st s
         orBlank [] = [""]
         orBlank ls = ls
 
--- | Run one line: parse it, carry out any electrocution effects, then run the command.
+-- | Run a line, or a block of lines joined with '\': parse every command in it,
+-- then run them in order. Nothing runs if any part of the block fails to parse.
 run :: ReplState -> String -> IO ReplState
-run st line = do
-  (vars', kicked) <- case parseCommand line of
-    Left err  -> say st ("Parse error: " ++ show err) >> return (vars st, False)
-    Right cmd -> do
-      let effects = electrocuteEffects (vars st) (commandExpr cmd)
-      mapM_ (say st . effectMessage) effects
-      let survivors = foldr bury (vars st) effects
-      newVars <- execute st survivors cmd
-      return (newVars, any isKick effects)
+run st block = case parseCommands block of
+  Left err   -> do
+    say st ("Parse error: " ++ show err)
+    return st { concussed = max 0 (concussed st - 1) }
+  Right cmds -> foldM runCommand st cmds
+
+-- | Run one command: carry out any electrocution effects, then the command itself.
+-- Each command counts as one line of concussion.
+runCommand :: ReplState -> Command -> IO ReplState
+runCommand st cmd = do
+  let effects = electrocuteEffects (vars st) (commandExpr cmd)
+  mapM_ (say st . effectMessage) effects
+  let survivors = foldr bury (vars st) effects
+  vars' <- execute st survivors cmd
   -- a fresh kick restarts the concussion for the lines *after* this one
-  let left | kicked    = concussionLines
-           | otherwise = max 0 (concussed st - 1)
+  let left | any isKick effects = concussionLines
+           | otherwise          = max 0 (concussed st - 1)
   return st { vars = vars', concussed = left }
   where
     bury (HorseDied (Just n)) vs = Map.delete n vs

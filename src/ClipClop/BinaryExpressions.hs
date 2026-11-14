@@ -278,6 +278,11 @@ valueOf x vars = maybe (Left ("variable not defined: " ++ x)) Right (Map.lookup 
 parseCommand :: String -> Either ParseError Command
 parseCommand = parse (pCommand <* eof) "<repl>"
 
+-- | Parse a block of one or more commands, e.g. several lines joined with '\'.
+-- Each command ends where the next one begins; an expression may span lines.
+parseCommands :: String -> Either ParseError [Command]
+parseCommands = parse (many1 pCommand <* eof) "<repl>"
+
 -- | Run a parser, then skip any trailing whitespace.
 lexeme :: Parser a -> Parser a
 lexeme p = p <* spaces
