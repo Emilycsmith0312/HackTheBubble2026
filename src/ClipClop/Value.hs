@@ -201,6 +201,10 @@ impValues _ _                           = (ErrValue "Invalid value type for: boo
 eqValues                        :: Value -> Value -> Value
 eqValues (ErrValue x) _                 = (ErrValue x)
 eqValues _ (ErrValue x)                 = (ErrValue x)
+eqValues (BoolValue x) (BoolValue y)    = BoolValue (x == y)
+eqValues (StrValue x) (StrValue y)      = BoolValue (x == y)
+eqValues (IntValue x) (IntValue y)      = BoolValue (x == y)
+eqValues (FloatValue x) (FloatValue y)  = BoolValue (x == y)
 eqValues _ _                            = (ErrValue "Invalid value type for: boolean EQUALS")
 
 notValues                       :: Value -> Value

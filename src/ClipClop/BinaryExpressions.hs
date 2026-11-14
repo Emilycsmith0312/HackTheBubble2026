@@ -2,6 +2,7 @@ module ClipClop.BinaryExpressions where
 
 import ClipClop.Value
 import Data.Map (Map)
+import Data.Char (toUpper, toLower)
 import qualified Data.Map as Map
 import Text.Parsec hiding (Empty)
 import Text.Parsec.String (Parser)
@@ -30,6 +31,8 @@ data Expr = Add Expr Expr     -- add two values
           | ToFloat Expr      -- to float
           | ToBool Expr       -- to bool
           | Electrocute Expr  -- flip the binary digits of a number
+          | Shout Expr        -- String to upper
+          | Whisper Expr      -- String to lower
           | Val Value         -- value
           | Var Name          -- variable support
   deriving Show
@@ -199,9 +202,20 @@ eval vars (ToFloat x) = case eval vars x of
                           Right (BoolValue True) -> Right (FloatValue 1.0)
                           Right (BoolValue False) -> Right (FloatValue 0.0)
                           _ -> Left "parse error"
-eval vars (Electrocute x) = do -- flip the bits of an integer/double
+eval vars (Electrocute x) = do 
+-- flip the bits of an integer/double
                         xNum <- eval vars x
                         Right (electrocuteValues xNum) -- call from Value.hs
+eval vars (Shout x) = case eval vars x of
+                        Right (StrValue s) -> Right(StrValue(map toUpper s))
+                        Right (FloatValue f) -> Right(StrValue(map toUpper (show $ FloatValue f)))
+                        Right (IntValue i) -> Right(StrValue(map toUpper (show $ IntValue i)))
+                        _ -> Left "parse error"
+eval vars (Whisper x) = case eval vars x of
+                        Right (StrValue s) -> Right(StrValue(map toLower s))
+                        Right (FloatValue f) -> Right(StrValue(show f))
+                        Right (IntValue i) -> Right(StrValue(show i))
+                        _ -> Left "parse error"
 eval vars (ToBool x) = case eval vars x of
                           Right (BoolValue _) -> eval vars x
                           Right (IntValue 0) -> Right (BoolValue False)
@@ -251,6 +265,7 @@ children e = case e of
   Nor a b -> [a, b];    Imp a b -> [a, b];  Eq a b -> [a, b]
   Abs a -> [a];         Not a -> [a];       ToString a -> [a];  ToInt a -> [a]
   ToFloat a -> [a];     ToBool a -> [a];    Electrocute a -> [a]
+  Shout a -> [a];       Whisper a -> [a]
   Val _ -> [];          Var _ -> []
 
 -- | Look a variable up in the environment.
@@ -278,10 +293,12 @@ keyword s = try (lexeme (string s *> notFollowedBy alphaNum))
 -- KEYWORDS --
 -- Every keyword is defined once here; the parsers and 'reserved' both use these.
 
-kwTrue, kwFalse, kwPrint, kwAbs, kwToString, kwToFloat, kwToInt, kwToBool :: String
+kwTrue, kwFalse, kwPrint, kwAbs, kwToString, kwToFloat, kwToInt, kwToBool, kwShout, kwWhisper :: String
 kwTrue     = "neighneigh"     -- true
 kwFalse    = "neigh"          -- false
-kwPrint    = "speakupgirl"    -- print
+kwPrint    = "saysomethinggirl" -- print
+kwShout    = "speakupgirl"    -- to upper
+kwWhisper  = "quietdowngirl"  -- to lower
 kwAbs      = "geld"           -- abs
 kwToString = "toSuffolkPunch" -- toString
 kwToFloat  = "maretosis"      -- toFloat
@@ -295,7 +312,7 @@ kwSays     = "says"           -- between the variable name and its value
 
 -- | Words that cannot be used as variable names.
 reserved :: [String]
-reserved = [kwTrue, kwFalse, kwPrint, kwAbs, kwToString, kwToFloat, kwToInt, kwToBool, kwThe, kwSays, kwElectrocute]
+reserved = [kwTrue, kwFalse, kwPrint, kwAbs, kwToString, kwToFloat, kwToInt, kwToBool, kwThe, kwSays, kwElectrocute, kwShout, kwWhisper]
         ++ ["duplicateHorse"] -- reserved for future use
 
 identifier :: Parser Name
@@ -325,7 +342,7 @@ pPrint :: Parser Command
 pPrint = optional (keyword kwPrint) *> (Print <$> pExpr)
 
 pExpr :: Parser Expr
-pExpr = pAbsolute <|> pNot <|> pToString <|> pToBool <|> pToNum <|> pElectrocute <|> pTerm
+pExpr = pAbsolute <|> pNot <|> pToString <|> pToBool <|> pToNum <|> pElectrocute <|> pTerm <|> pShout <|> pWhisper
 
 pTerm :: Parser Expr
 pTerm = chainl1 pFactor (booleanOperators <|> concatOperator <|> modPowOperator <|> mulDivOperator <|> addSubOperator)
@@ -388,8 +405,10 @@ pVariable = Var <$> identifier
 pParenExpr :: Parser Expr
 pParenExpr = between (symbol "(") (symbol ")") pExpr
 
-pToString, pToBool, pToNum, pToInt, pToFloat, pAbsolute, pNot, pElectrocute :: Parser Expr
+pToString, pToBool, pToNum, pToInt, pToFloat, pAbsolute, pNot, pElectrocute, pShout, pWhisper :: Parser Expr
 pElectrocute = Electrocute <$> (keyword kwElectrocute *> pExpr)
+pShout = Shout <$> (keyword kwShout *> pExpr)
+pWhisper = Whisper <$> (keyword kwWhisper *> pExpr)
 pToString = ToString <$> (keyword kwToString *> pExpr)
 pToBool   = ToBool   <$> (keyword kwToBool *> pExpr)
 pToNum    = pToFloat <|> pToInt

@@ -17,7 +17,7 @@ data ReplState = ReplState
 repl :: IO ()
 repl = do
   hSetBuffering stdout NoBuffering
-  putStrLn "Clip Clop REPL. Type :q to quit."
+  putStrLn "\nClip Clop REPL. Type shoo to quit.\n"
   loop (ReplState Map.empty 0)
 
 -- | Read a line, run it, and loop with the updated state.
@@ -30,7 +30,7 @@ loop st = do
     else do
       line <- getLine
       case line of
-        ":q" -> say st "Bye."
+        "shoo" -> mapM_ (\name -> say st ("Bye " ++ name)) (Map.keys (vars st))
         _ | all (== ' ') line -> loop st
           | otherwise -> run st line >>= loop
 
